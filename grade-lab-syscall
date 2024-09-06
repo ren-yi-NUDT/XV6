@@ -15,24 +15,74 @@ def test_trace_32_grep():
     r.run_qemu(shell_script([
         'trace 32 grep hello README'
     ]))
-    r.match('^\\d+: syscall read -> 1023')
-    r.match('^\\d+: syscall read -> 961')
-    r.match('^\\d+: syscall read -> 321')
-    r.match('^\\d+: syscall read -> 0')
+
+    sys_cnt = {
+    'read' : 0
+    }
+
+    sys_cnt['read'] += 1
+    s = r'^\d+: syscall read\(trace counts: ' + str(sys_cnt['read']) + r'\) -> 1023'
+    r.match(s)
+
+    sys_cnt['read'] += 1
+    s = r'^\d+: syscall read\(trace counts: ' + str(sys_cnt['read']) + r'\) -> 961'
+    r.match(s)
+
+    sys_cnt['read'] += 1
+    s = r'^\d+: syscall read\(trace counts: ' + str(sys_cnt['read']) + r'\) -> 321'
+    r.match(s)
+
+    sys_cnt['read'] += 1
+    s = r'^\d+: syscall read\(trace counts: ' + str(sys_cnt['read']) + r'\) -> 0'
+    r.match(s)
 
 @test(5, "trace all grep")
 def test_trace_all_grep():
     r.run_qemu(shell_script([
         'trace 2147483647 grep hello README'
     ]))
-    r.match('^\\d+: syscall trace -> 0')
-    r.match('^\\d+: syscall exec -> 3')
-    r.match('^\\d+: syscall open -> 3')
-    r.match('^\\d+: syscall read -> 1023')
-    r.match('^\\d+: syscall read -> 961')
-    r.match('^\\d+: syscall read -> 321')
-    r.match('^\\d+: syscall read -> 0')
-    r.match('^\\d+: syscall close -> 0')
+
+    sys_cnt = {
+    'read' : 0,
+    'trace' : 0,
+    'exec' : 0,
+    'open' : 0,
+    'close' : 0,
+    'fork' : 0,
+    }
+
+    sys_cnt['trace'] += 1
+    s = r'^\d+: syscall trace\(trace counts: ' + str(sys_cnt['trace']) + r'\) -> 0'
+    r.match(s)
+
+    sys_cnt['exec'] += 1
+    s = r'^\d+: syscall exec\(trace counts: ' + str(sys_cnt['exec']) + r'\) -> 3'
+    r.match(s)
+
+    sys_cnt['open'] += 1
+    s = r'^\d+: syscall open\(trace counts: ' + str(sys_cnt['open']) + r'\) -> 3'
+    r.match(s)
+
+
+    sys_cnt['read'] += 1
+    s = r'^\d+: syscall read\(trace counts: ' + str(sys_cnt['read']) + r'\) -> 1023'
+    r.match(s)
+
+    sys_cnt['read'] += 1
+    s = r'^\d+: syscall read\(trace counts: ' + str(sys_cnt['read']) + r'\) -> 961'
+    r.match(s)
+
+    sys_cnt['read'] += 1
+    s = r'^\d+: syscall read\(trace counts: ' + str(sys_cnt['read']) + r'\) -> 321'
+    r.match(s)
+
+    sys_cnt['read'] += 1
+    s = r'^\d+: syscall read\(trace counts: ' + str(sys_cnt['read']) + r'\) -> 0'
+    r.match(s)
+
+    sys_cnt['close'] += 1
+    s = r'^\d+: syscall close\(trace counts: ' + str(sys_cnt['close']) + r'\) -> 0'
+    r.match(s)
 
 @test(5, "trace nothing")
 def test_trace_nothing():
@@ -46,10 +96,29 @@ def test_trace_children():
     r.run_qemu(shell_script([
         'trace 2 usertests forkforkfork'
     ]))
-    r.match('3: syscall fork -> 4')
-    r.match('^5: syscall fork -> \\d+')
-    r.match('^6: syscall fork -> \\d+')
-    r.match('^\\d+: syscall fork -> -1')
+
+    sys_cnt = {
+    'read' : 0,
+    'trace' : 0,
+    'exec' : 0,
+    'open' : 0,
+    'close' : 0,
+    'fork' : 0,
+    }
+
+    sys_cnt['fork'] += 1
+    s = r'3: syscall fork\(trace counts: ' + str(sys_cnt['fork']) + r'\) -> 4'
+    r.match(s)
+    
+    s = r'^5: syscall fork\(trace counts: \d+\) -> \d+'
+    r.match(s)
+    
+    s = r'^6: syscall fork\(trace counts: \d+\) -> \d+'
+    r.match(s)
+
+    s = r'^\d+: syscall fork\(trace counts: \d+\) -> -1'
+    r.match(s)
+    
     r.match('^ALL TESTS PASSED')
 
 @test(14, "sysinfotest")
@@ -64,6 +133,4 @@ def test_time():
     check_time()
 
 run_tests()
-
-
 

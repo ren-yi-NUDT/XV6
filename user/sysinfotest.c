@@ -92,12 +92,13 @@ testcall() {
 
 void testproc() {
   struct sysinfo info;
-  uint64 nproc;
+  uint64 nproc, unused_proc_num;
   int status;
   int pid;
   
   sinfo(&info);
   nproc = info.nproc;
+  unused_proc_num = info.unused_proc_num;
 
   pid = fork();
   if(pid < 0){
@@ -110,12 +111,21 @@ void testproc() {
       printf("sysinfotest: FAIL nproc is %d instead of %d\n", info.nproc, nproc+1);
       exit(1);
     }
+  
+    if(info.unused_proc_num != unused_proc_num-1) {
+      printf("sysinfotest: FAIL unused_proc_num is %d instead of %d\n", info.unused_proc_num, unused_proc_num-1);
+      exit(1);
+    }
     exit(0);
   }
   wait(&status);
   sinfo(&info);
   if(info.nproc != nproc) {
       printf("sysinfotest: FAIL nproc is %d instead of %d\n", info.nproc, nproc);
+      exit(1);
+  }
+  if(info.unused_proc_num != unused_proc_num) {
+      printf("sysinfotest: FAIL unused_proc_num is %d instead of %d\n", info.unused_proc_num, unused_proc_num);
       exit(1);
   }
 }
