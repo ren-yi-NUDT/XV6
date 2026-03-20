@@ -139,6 +139,7 @@ UPROGS=\
 	$U/_rm\
 	$U/_sh\
 	$U/_wc\
+	$U/_sleep\
 	$U/_zombie\
 	$U/_mysh\
 	$U/_grind\
