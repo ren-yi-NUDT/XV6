@@ -141,6 +141,7 @@ UPROGS=\
 	$U/_wc\
 	$U/_sleep\
 	$U/_pingpong\
+	$U/_primes\
 	$U/_zombie\
 	$U/_mysh\
 	$U/_grind\
