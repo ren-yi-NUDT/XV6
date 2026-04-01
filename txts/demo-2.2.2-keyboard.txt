@@ -1,0 +1,292 @@
+//目的：分析键盘中断的处理过程。
+
+//以调试模式启动qemu虚拟机
+demo@ali4nudtOS:/home/os/lab$ make qemu-gdb
+cp fs.img ~/
+*** Now run 'gdb' in another window.
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 1  -nographic -global virtio-mmio.force-legacy=false -drive file=/home/demo/fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -S -gdb tcp::26129
+
+
+//现在*切换到另一个Windows命令行窗口*，然后再次登录云服务
+F:\tmp>ssh demo@47.122.113.125
+...
+
+//启动gdb
+demo@ali4nudtOS:/home/os/lab$ ./mygdb
+GNU gdb (Ubuntu 12.1-0ubuntu1~22.04.2) 12.1
+Copyright (C) 2022 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Type "show copying" and "show warranty" for details.
+This GDB was configured as "x86_64-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<https://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+    <http://www.gnu.org/software/gdb/documentation/>.
+
+For help, type "help".
+Type "apropos word" to search for commands related to "word".
+GDBTARGET = localhost:26129
+0x0000000000001000 in ?? ()
+The target architecture is set to "riscv:rv64".
+Breakpoint 1 at 0x8000008c: file kernel/start.c, line 22.
+Breakpoint 2 at 0x80002508: file kernel/proc.c, line 660.
+
+//跟踪到执行loop程序
+(gdb) b exec
+Breakpoint 3 at 0x80004b3a: file kernel/exec.c, line 24.
+(gdb) c
+Continuing.
+
+Breakpoint 1, start () at kernel/start.c:22
+22      {
+1: $priv = 3
+2: /x cpus[$mhartid].proc = 0x0
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x30>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x158>
+(gdb) c
+Continuing.
+
+Breakpoint 3, exec (path=path@entry=0x3fffffdf00 "/init", argv=argv@entry=0x3fffffde00) at kernel/exec.c:24
+24      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80010f80
+3: cpus[$mhartid].proc.pid = 1
+4: cpus[$mhartid].proc.name = "initcode\000\000\000\000\000\000\000"
+(gdb) c
+Continuing.
+
+Breakpoint 3, exec (path=path@entry=0x3fffffbf00 "sh", argv=argv@entry=0x3fffffbe00) at kernel/exec.c:24
+24      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x800110e8
+3: cpus[$mhartid].proc.pid = 2
+4: cpus[$mhartid].proc.name = "init", '\000' <repeats 11 times>
+  //即将执行命令解释器，继续跟踪
+
+(gdb) c
+Continuing.
+  //此时gdb调试器进入运行状态，现在*切换到qemu终端*，可以看到：
+
+------------------------------{
+xv6 kernel is booting
+
+init: starting sh
+$
+------------------------------}
+
+//现在运行loop程序
+------------------------------{
+init: starting sh
+$ loop
+
+------------------------------}
+
+//然后再切回gdb终端，可以看到：
+Breakpoint 3, exec (path=path@entry=0x3fffff9f00 "loop", argv=argv@entry=0x3fffff9e00) at kernel/exec.c:24
+24      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80011250
+3: cpus[$mhartid].proc.pid = 3
+4: cpus[$mhartid].proc.name = "sh", '\000' <repeats 13 times>
+  //可见即将执行loop程序
+
+//现在加载loop的符号文件
+(gdb) add-symbol-file user/_loop 0
+add symbol table from file "user/_loop" at
+        .text_addr = 0x0
+Reading symbols from user/_loop...
+
+//然后在loop程序的开始点设断点，并跟踪过去
+(gdb) b *0x0
+Breakpoint 4 at 0x0: file user/loop.c, line 8.
+
+(gdb) c
+Continuing.
+
+Breakpoint 4, main (argc=0, argv=0x0 <main>) at user/loop.c:8
+8       {
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010b80>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010b80>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010b80>
+  //可见当前在执行loop.c:main()，查看汇编码：
+
+(gdb) disassemble
+Dump of assembler code for function main:
+=> 0x0000000000000000 <+0>:     addi    sp,sp,-32
+   0x0000000000000002 <+2>:     sd      s0,24(sp)
+   0x0000000000000004 <+4>:     addi    s0,sp,32
+   0x0000000000000006 <+6>:     mv      a5,a0
+   0x0000000000000008 <+8>:     sd      a1,-32(s0)
+   0x000000000000000c <+12>:    sw      a5,-20(s0)
+   0x0000000000000010 <+16>:    auipc   a5,0x1
+   0x0000000000000014 <+20>:    addi    a5,a5,-16 # 0x1000 <counter>
+   0x0000000000000018 <+24>:    lw      a5,0(a5)
+   0x000000000000001a <+26>:    addiw   a5,a5,1
+   0x000000000000001c <+28>:    sext.w  a4,a5
+   0x0000000000000020 <+32>:    auipc   a5,0x1
+   0x0000000000000024 <+36>:    addi    a5,a5,-32 # 0x1000 <counter>
+   0x0000000000000028 <+40>:    sw      a4,0(a5)
+   0x000000000000002a <+42>:    j       0x10 <main+16>
+End of assembler dump.
+  //可见即将进入0x10~0x2a处的死循环
+
+//现在键盘中断处理程序处设断点，然后继续运行
+(gdb) b consoleintr
+Breakpoint 5 at 0x800002be: file kernel/console.c, line 137.
+(gdb) c
+Continuing.
+
+  //可见gdb再次进入持续运行状态，捕获不到断点，现在切换到qemu终端，可见loop正在运行：
+------------------------------{
+nit: starting sh
+$ loop
+
+------------------------------}
+
+//现在*按一下键盘（如回车）*
+------------------------------{
+init: starting sh
+$ loop
+
+------------------------------}
+  //屏幕上没反应，现在切换回gdb终端，可见：
+
+Breakpoint 5, consoleintr (c=13) at kernel/console.c:137
+137     {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80011250
+3: cpus[$mhartid].proc.pid = 3
+4: cpus[$mhartid].proc.name = "loop", '\000' <repeats 11 times>
+  //这说明键盘中断处理程序开始执行了，观察函数调用栈
+
+(gdb) bt
+#0  consoleintr (c=13) at kernel/console.c:137
+#1  0x00000000800009ae in uartintr () at kernel/uart.c:183
+#2  0x00000000800027b2 in devintr () at kernel/trap.c:190
+#3  0x0000000080002826 in usertrap () at kernel/trap.c:68
+#4  0x000000000000003c in _main () at user/ulib.c:13
+Backtrace stopped: previous frame inner to this frame (corrupt stack?)
+  //可见是由陷阱处理程序（usertrap, uservec)间接调用此中断处理程序
+
+//查看恢复点
+(gdb) p/x $sepc
+$1 = 0x24
+  //0x24是前面看到过的死循环地址范围所在
+
+//现在跟踪到uservec中的sret指令
+(gdb) b *0x3ffffff11c
+Breakpoint 6 at 0x3ffffff11c
+(gdb) c
+Continuing.
+
+Breakpoint 6, 0x0000003ffffff11c in ?? ()
+=> 0x0000003ffffff11c:  73 00 20 10     sret
+1: $priv = 1
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010b80>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010b80>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010b80>
+
+//再次查看$sepc
+(gdb) p/x $sepc
+$2 = 0x24
+  //没变
+
+//现在跟踪到该恢复点
+(gdb) b *0x24
+Breakpoint 7 at 0x24: file user/loop.c, line 10.
+
+(gdb) stepi
+
+Breakpoint 7, 0x0000000000000024 in main (argc=1, argv=0x3fe0) at user/loop.c:10
+10          counter++;
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010b80>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010b80>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010b80>
+  //可见已经切换到U模式（用户态），查看当前指令：
+
+(gdb) disassemble
+Dump of assembler code for function main:
+   0x0000000000000000 <+0>:     addi    sp,sp,-32
+   0x0000000000000002 <+2>:     sd      s0,24(sp)
+   0x0000000000000004 <+4>:     addi    s0,sp,32
+   0x0000000000000006 <+6>:     mv      a5,a0
+   0x0000000000000008 <+8>:     sd      a1,-32(s0)
+   0x000000000000000c <+12>:    sw      a5,-20(s0)
+   0x0000000000000010 <+16>:    auipc   a5,0x1
+   0x0000000000000014 <+20>:    addi    a5,a5,-16 # 0x1000 <counter>
+   0x0000000000000018 <+24>:    lw      a5,0(a5)
+   0x000000000000001a <+26>:    addiw   a5,a5,1
+   0x000000000000001c <+28>:    sext.w  a4,a5
+   0x0000000000000020 <+32>:    auipc   a5,0x1
+=> 0x0000000000000024 <+36>:    addi    a5,a5,-32 # 0x1000 <counter>
+   0x0000000000000028 <+40>:    sw      a4,0(a5)
+   0x000000000000002a <+42>:    j       0x10 <main+16>
+End of assembler dump.
+  //可见恢复点在循环内
+
+//关闭断点7
+(gdb) disable 7
+
+//继续调试
+(gdb) c
+Continuing.
+
+Breakpoint 6, 0x0000003ffffff11c in ?? ()
+=> 0x0000003ffffff11c:  73 00 20 10     sret
+1: $priv = 1
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010b80>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010b80>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010b80>
+  //又一次返回用户态（为什么？请思考），查看这次的恢复点：
+
+(gdb) p/x $sepc
+$3 = 0x1c
+  //也在循环范围内，继续运行：
+
+(gdb) c
+Continuing.
+
+  //gdb再次持续运行起来
+
+//现在重复前面的操作，首先切换到qemu终端，可见loop正在运行（光标下移了一行）：
+------------------------------{
+nit: starting sh
+$ loop
+
+
+------------------------------}
+
+//现在*按一下键盘（如回车）*
+------------------------------{
+init: starting sh
+$ loop
+
+
+------------------------------}
+  //屏幕上没反应，现在切换回gdb终端，可见：
+
+Breakpoint 5, consoleintr (c=13) at kernel/console.c:137
+137     {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80011250
+3: cpus[$mhartid].proc.pid = 3
+4: cpus[$mhartid].proc.name = "loop", '\000' <repeats 11 times>
+
+//观察恢复点
+(gdb) p/x $sepc
+$4 = 0x28
+  //可见恢复点这次变成了0x28，但依然在循环范围内。
+
+//现在结束调试
+(gdb) kill
+[Inferior 1 (process 1) killed]
+
+(gdb) quit
+ubuntu@ubuntu-2204:~/os/lab/0$ 
+
+//总结一下，在loop程序执行时，如果按下键盘，可能会中断该循环的执行，具体在哪一行并不确定，但一定在循环范围内。

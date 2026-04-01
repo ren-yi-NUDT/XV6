@@ -143,6 +143,7 @@ UPROGS=\
 	$U/_pingpong\
 	$U/_primes\
 	$U/_xargs\
+	$U/_loop\
 	$U/_zombie\
 	$U/_mysh\
 	$U/_grind\
