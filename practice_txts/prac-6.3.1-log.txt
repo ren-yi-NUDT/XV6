@@ -1,0 +1,186 @@
+//目的：分析xv6的日志工作过程。
+
+//首先将xv6源码拷贝到自己的home目录下
+demo@ali4nudtOS:~$ cp -a /home/os/lab ~/
+demo@ali4nudtOS:~$ cd ~/lab
+demo@ali4nudtOS:~/lab$ 
+
+//正常运行一遍（以在硬盘中创建`/console`）
+demo@ali4nudtOS:~/lab$ make qemu
+  //第一次使用硬盘镜像文件fs.img时，启动过程中会创建文件`/console`，进而导致执行commit().
+
+//现在植入bug到代码中，使在正常写入文件系统之前崩溃
+-----------------------------{  // "kernel/log.c"
+static void
+commit()
+{
+  if (log.lh.n > 0) {
+    write_log();     // Write modified blocks from cache to log
+    write_head();    // Write header to disk -- the real commit
+    panic("Crashed before install_trans() !");  // for test, by wyj.
+    install_trans(0); // Now install writes to home locations
+    log.lh.n = 0;
+    write_head();    // Erase the transaction from the log
+  }
+}
+-----------------------------}
+
+//然后重新编译内核，启动qemu虚拟机（直接使用`~/fs.img`，里面已经创建有`/console`）
+-----------------------------{
+demo@ali4nudtOS:~/lab$ make
+...
+demo@ali4nudtOS:~/lab$ make qemu-notcp
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 1 -nographic -global virtio-mmio.force-legacy=false -drive file=/home/demo/fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+xv6 kernel is booting
+
+init: starting sh 
+-----------------------------}
+//查看根目录内容：
+$ ls
+.              1 1 1024
+..             1 1 1024
+tests          1 2 160
+README         2 3 2528
+cat            2 5 32248
+echo           2 6 31096
+grep           2 7 35616
+init           2 8 31592
+kill           2 9 31040
+ln             2 10 30864
+ls             2 11 34184
+mkdir          2 12 31112
+rm             2 13 31104
+sh             2 14 53952
+wc             2 15 33192
+zombie         2 16 30464
+mysh           2 17 53544
+grind          2 18 46920
+usertests      2 19 179880
+forktest       2 20 15984
+stressfs       2 21 31960
+console        3 29 0
+
+//删除README
+$ rm README
+panic: Crashed before install_trans() !
+  //此时系统崩溃
+
+//关闭qemu（按ctr-a x）
+QEMU: Terminated
+demo@ali4nudtOS:~/lab$ 
+
+//观察崩溃后的fs.img
+demo@ali4nudtOS:~/lab$ hexdump -C ~/fs.img | less
+0000b800  01 00 2e 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+0000b810  01 00 2e 2e 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+0000b820  02 00 74 65 73 74 73 00  00 00 00 00 00 00 00 00  |..tests.........|
+0000b830  03 00 52 45 41 44 4d 45  00 00 00 00 00 00 00 00  |..README........|
+0000b840  05 00 63 61 74 00 00 00  00 00 00 00 00 00 00 00  |..cat...........|
+  //可见根目录的README文件依然在
+
+//查看log区的log头
+00000800  03 00 00 00 2e 00 00 00  20 00 00 00 2d 00 00 00  |........ ...-...|
+00000810  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*
+  //可见log区记录了3个新块，分别是0x2e号、0x20号和0x2d号，
+   //分别对应到根目录数据块（第1个/只有1个）、第1个inode块（根目录和README的inode所在）、
+   //位图块（第1个/只有1个），它们分别存放在log区接下来的3个磁盘块中
+
+//log区接下来的第1个磁盘块：记录了0x2e号磁盘块的新数据（根目录数据块）
+00000c00  01 00 2e 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000c10  01 00 2e 2e 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000c20  02 00 74 65 73 74 73 00  00 00 00 00 00 00 00 00  |..tests.........|
+00000c30  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000c40  05 00 63 61 74 00 00 00  00 00 00 00 00 00 00 00  |..cat...........|
+  //可见其中README已经被删除
+
+//log区接下来的第2个磁盘块：记录了0x20号磁盘块的新数据（第1个inode块）
+*
+00001040  01 00 00 00 00 00 01 00  00 04 00 00 2e 00 00 00  |................|
+00001050  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*
+00001080  01 00 00 00 00 00 01 00  a0 00 00 00 2f 00 00 00  |............/...|
+00001090  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*
+00001100  02 00 00 00 00 00 01 00  09 00 00 00 33 00 00 00  |............3...|
+00001110  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*
+  //其中的3号索引节点（起始地址0x10c0）已经被删除
+
+//log区接下来的第3个磁盘块：记录了0x2d号磁盘块的新数据（位图块）
+00001400  ff ff ff ff ff ff f8 ff  ff ff ff ff ff ff ff ff  |................|
+00001410  ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
+*
+00001470  ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff 03  |................|
+00001480  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*
+  //其中已有3个磁盘块被释放
+
+//现在重启qemu虚拟机
+demo@ali4nudtOS:~/lab$ make qemu-notcp
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 1 -nographic -global virtio-mmio.force-legacy=false -drive file=/home/demo/fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+xv6 kernel is booting
+
+init: starting sh 
+
+//查看根目录内容
+$ ls
+.              1 1 1024
+..             1 1 1024
+tests          1 2 160
+cat            2 5 32248
+echo           2 6 31096
+grep           2 7 35616
+init           2 8 31592
+kill           2 9 31040
+ln             2 10 30864
+ls             2 11 34184
+mkdir          2 12 31112
+rm             2 13 31104
+sh             2 14 53952
+wc             2 15 33192
+zombie         2 16 30464
+mysh           2 17 53544
+grind          2 18 46920
+usertests      2 19 179880
+forktest       2 20 15984
+stressfs       2 21 31960
+console        3 29 0
+  //可见README已被删除，文件系统恢复一致、内容正确
+
+//退出qemu，观察fs.img的log区
+$ QEMU: Terminated
+demo@ali4nudtOS:~/lab$ hexdump -C ~/fs.img | less
+00000800  00 00 00 00 2e 00 00 00  20 00 00 00 2d 00 00 00  |........ ...-...|
+00000810  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*
+  //可见log头的“待更新磁盘块数量”已经归0（第一个字为0x00000000），该日志已经释放.
+
+0000b800  01 00 2e 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+0000b810  01 00 2e 2e 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+0000b820  02 00 74 65 73 74 73 00  00 00 00 00 00 00 00 00  |..tests.........|
+0000b830  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+0000b840  05 00 63 61 74 00 00 00  00 00 00 00 00 00 00 00  |..cat...........|
+  //文件系统的根目录被正确修改，内容来自log区
+
+
+//至此我们知道，log中记录了磁盘块的新内容，启动时如果发现其未释放，则重做日志，使文件系统恢复一致。
+
+//请问：如果植入以下bug，系统崩溃后，日志区的状态是怎样的？会有什么效果？
+-----------------------------{  // "kernel/log.c"
+static void
+commit()
+{
+  if (log.lh.n > 0) {
+    write_log();     // Write modified blocks from cache to log
+    panic("Crashed before install_trans() !");  // for test, by wyj.
+    write_head();    // Write header to disk -- the real commit
+    install_trans(0); // Now install writes to home locations
+    log.lh.n = 0;
+    write_head();    // Erase the transaction from the log
+  }
+}
+-----------------------------}
+

@@ -1,0 +1,164 @@
+//目的：分析sbrk系统调用。
+
+//被分析程序va3.c:
+------------------------------{
+#include "kernel/types.h"
+#include "kernel/stat.h"
+#include "user/user.h"
+
+int
+main (int argc, char *argv[])
+{
+  void *p1, *p2, *p3; 
+  printf ("location of malloc(0x1000) : %p\n", (p1 = malloc (0x1000)));
+  printf ("location of malloc(0x10000) : %p\n", (p2 = malloc (0x10000)));
+  free(p2);
+  printf ("location of malloc(0x100) : %p\n", (p3 = malloc (0x100)));
+  free(p1);
+  free(p3);
+  return 0;
+}
+------------------------------}
+
+demo@ali4nudtOS:~/os/lab$ ./mygdb
+GNU gdb (Ubuntu 12.1-0ubuntu1~22.04.2) 12.1
+Copyright (C) 2022 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Type "show copying" and "show warranty" for details.
+This GDB was configured as "x86_64-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<https://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+    <http://www.gnu.org/software/gdb/documentation/>.
+
+For help, type "help".
+Type "apropos word" to search for commands related to "word".
+GDBTARGET = localhost:26001
+0x0000000000001000 in ?? ()
+The target architecture is set to "riscv:rv64".
+Breakpoint 1 at 0x8000008c: file kernel/start.c, line 22.
+Breakpoint 2 at 0x80002520: file kernel/proc.c, line 660.
+
+//跟踪到va3的运行
+(gdb) b exec
+Breakpoint 3 at 0x80004bb0: file kernel/exec.c, line 24.
+
+(gdb) c
+Continuing.
+
+Breakpoint 1, start () at kernel/start.c:22
+22      {
+1: $priv = 3
+2: /x cpus[$mhartid].proc = 0x0
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x30>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x158>
+
+(gdb)
+Continuing.
+
+Breakpoint 3, exec (path=path@entry=0x3fffffdf00 "/init", argv=argv@entry=0x3fffffde00) at kernel/exec.c:24
+24      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80010fe0
+3: cpus[$mhartid].proc.pid = 1
+4: cpus[$mhartid].proc.name = "initcode\000\000\000\000\000\000\000"
+
+(gdb) c
+Continuing.
+
+Breakpoint 3, exec (path=path@entry=0x3fffffbf00 "sh", argv=argv@entry=0x3fffffbe00) at kernel/exec.c:24
+24      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80011148
+3: cpus[$mhartid].proc.pid = 2
+4: cpus[$mhartid].proc.name = "init", '\000' <repeats 11 times>
+
+(gdb) c
+Continuing.
+
+------------------------{
+xv6 kernel is booting
+
+init: starting sh
+$ va3
+
+------------------------}
+
+Breakpoint 3, exec (path=path@entry=0x3fffff9f00 "va3", argv=argv@entry=0x3fffff9e00) at kernel/exec.c:24
+24      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x800112b0
+3: cpus[$mhartid].proc.pid = 3
+4: cpus[$mhartid].proc.name = "sh", '\000' <repeats 13 times>
+
+//加载va3的符号
+(gdb) add-symbol-file user/tests/_va3 0
+add symbol table from file "user/tests/_va3" at
+        .text_addr = 0x0
+Reading symbols from user/tests/_va3...
+
+//跟踪sbrk系统调用的接口函数和实现函数
+(gdb) b sbrk
+Breakpoint 4 at 0x3a2: file user/usys.S, line 95.
+
+(gdb) b sys_sbrk
+Breakpoint 5 at 0x80002c46: file kernel/sysproc.c, line 42.
+
+(gdb) c
+Continuing.
+
+Breakpoint 4, sbrk () at user/usys.S:95
+95       li a7, SYS_sbrk
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+  //接口函数开始执行，查看函数调用栈：
+
+(gdb) bt
+#0  sbrk () at user/usys.S:95
+#1  0x0000000000000852 in morecore (nu=4096) at user/umalloc.c:54
+#2  0x00000000000009aa in malloc (nbytes=4096) at user/umalloc.c:87
+#3  0x0000000000000016 in main (argc=<optimized out>, argv=<optimized out>) at user/tests/va3.c:9
+#4  0x00000000000000a4 in _main () at user/ulib.c:13
+#5  0x0000000000000100 in strlen (s=0x10000 <error: Cannot access memory at address 0x10000>) at user/ulib.c:41
+Backtrace stopped: frame did not save the PC
+  //可见是malloc函数执行过程中调用了sbrk，当时malloc试图分配4096字节
+
+//继续跟踪到实现函数
+(gdb) c
+Continuing.
+
+Breakpoint 5, sys_sbrk () at kernel/sysproc.c:42
+42      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x800112b0
+3: cpus[$mhartid].proc.pid = 3
+4: cpus[$mhartid].proc.name = "va3", '\000' <repeats 12 times>
+
+//查看此时的break
+(gdb) p/x cpus[0].proc.sz
+$1 = 0x4000
+  //可见此时进程地址空间只有4个页面（代码页、数据页、guard页、栈页），堆空间为0
+
+//跟踪到系统调用sbrk执行完
+(gdb) finish
+Run till exit from #0  sys_sbrk () at kernel/sysproc.c:42
+0x0000000080002b90 in syscall () at kernel/syscall.c:147
+147         p->trapframe->a0 = syscalls[num]();
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x800112b0
+3: cpus[$mhartid].proc.pid = 3
+4: cpus[$mhartid].proc.name = "va3", '\000' <repeats 12 times>
+Value returned is $2 = 16384
+
+//查看此时新的break
+(gdb) p/x cpus[0].proc.sz
+$3 = 0x14000
+  //可见已经扩大了0x10000字节（64KB），这是每次增加的最小值。
+
+
+//小结一下，sbrk系统调用用于调整进程堆空间的上界，一般在malloc等库函数中调用。

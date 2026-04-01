@@ -1,0 +1,478 @@
+//目的：分析Linux 0.12的虚存机制。
+
+//---文件0.gdb的内容：
+target remote localhost:1234
+handle SIGSEGV nostop noprint ignore
+b main
+display current->pid
+c
+
+//---文件swaptest.c的内容：
+#include <stdio.h>
+#include <stdlib.h>
+
+#define NUM_OF_PAGES 4096
+
+int main()
+{
+	char *buf;
+	int i;
+	buf = malloc(4096 * NUM_OF_PAGES);
+	if (buf == 0) {
+		printf("Error in malloc()\n");
+		exit(1);
+	}
+	for (i=0; i<NUM_OF_PAGES; i++)
+		buf[4096*i] = 1;
+	free(buf);	
+	return 0;
+}
+
+//---调试过程：
+
+//首先查看qemu虚拟机的硬盘交换分区
+demo@ali4nudtOS:/home/os/linux-0.12$ ls
+0.gdb  hdc-0.12.img  init    Makefile         mount-hdc  README.md   tmp
+boot   Image         kernel  Makefile.header  mygdb      System.map  tools
+fs     include       lib     mm               NOTES      system.S
+  //其中hdc-0.12.img为硬盘镜像文件，查看其信息：
+
+demo@ali4nudtOS:/home/os/linux-0.12$ file hdc-0.12.img 
+hdc-0.12.img: DOS/MBR boot sector; partition 1 : ID=0x81, start-CHS (0x0,1,1), end-CHS (0x3c,8,32), startsector 1, 60984 sectors; partition 2 : ID=0x82, start-CHS (0x3c,9,32), end-CHS (0x78,14,63), startsector 60985, 60982 sectors
+  //可见其中包含两个分区；分区2是交换分区（ID=0x82），其起始扇区是60985，查看其值：
+
+demo@ali4nudtOS:/home/os/linux-0.12$ hexdump hdc-0.12.img -C -s $((512*60985)) -n 4096
+01dc7200  fe ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
+01dc7210  ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
+*
+01dc75b0  ff ff ff ff ff ff ff ff  3f 00 00 00 00 00 00 00  |........?.......|
+01dc75c0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*
+01dc81f0  00 00 00 00 00 00 53 57  41 50 2d 53 50 41 43 45  |......SWAP-SPACE|
+01dc8200
+  //其中值为1的二进制位对应的交换页是未分配的（可用的）；0号交换页存放上面的位图，不可用。
+
+//以调试模式启动qemu虚拟机
+demo@ali4nudtOS:/home/os/linux-0.12$ make qemu-gdb
+
+//切换到另一个终端，启动gdb
+demo@ali4nudtOS:/home/os/linux-0.12$ ./mygdb
+GNU gdb (Ubuntu 12.1-0ubuntu1~22.04.2) 12.1
+Copyright (C) 2022 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Type "show copying" and "show warranty" for details.
+This GDB was configured as "x86_64-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<https://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+    <http://www.gnu.org/software/gdb/documentation/>.
+
+For help, type "help".
+Type "apropos word" to search for commands related to "word"...
+Reading symbols from tools/system...
+GDBTARGET = localhost:26129
+0x0000fff0 in write_inode (inode=0x0 <startup_32>) at inode.c:461
+461                     [(inode->i_num - 1) % INODES_PER_BLOCK] =
+Breakpoint 1 at 0x6870: file init/main.c, line 198.
+
+Breakpoint 1, main () at init/main.c:198
+198     {                        /* The startup routine assumes (well, ...) this */
+1: current->pid = 0
+
+//设置断点来跟踪换出
+(gdb) b swap_out
+Breakpoint 2 at 0xdd52: file swap.c, line 176.
+
+//继续
+(gdb) c
+Continuing.
+
+//现在切换到qemu终端，输入命令./swaptest
+------------------------------------------{
+demo@ali4nudtOS:/home/os/linux-0.12$ make qemu-gdb
+*** Now run 'gdb' in another window.
+Free mem: 12451840 bytes
+ Ok.
+[/usr/root]# ./swaptest
+------------------------------------------}
+
+//再切回gdb终端，可以看到：
+Breakpoint 2, swap_out () at swap.c:176
+176     {
+1: current->pid = 6
+  //捕获到第一次换出，查看调用栈：
+
+(gdb) bt
+#0  swap_out () at swap.c:176
+#1  0x0000df10 in get_free_page () at swap.c:263
+#2  0x0000d10b in get_empty_page (address=280387584) at memory.c:475
+#3  0x0000d53f in do_no_page (error_code=6, address=280387584) at memory.c:678
+#4  0x0000e1b5 in page_fault ()
+#5  0x00000006 in startup_32 ()
+Backtrace stopped: Cannot access memory at address 0x3bffef4
+  //可见是在缺页异常的处理中引发了换出动作，该异常发生时是在访问虚拟地址280510464
+
+(gdb) p/x 280387584
+$1 = 0x10b66000
+  //可见是6号进程访问虚拟地址0x10b66000（页面0x10b66）时，引发了缺页异常（页故障）
+
+(gdb) list
+171	 */
+172	// 把内存页面放到交换设备中.
+173	// 从线性地址64MB对应的目录项(FIRST_VM_PAGE>>10)开始,搜索整个4GB线性空间,对有效页目录二级页表指定的物理内存页面执行交换
+174	// 到交换设备中去的尝试.一旦成功地交换出一个页面,就返回-1.否则返回0.该函数会在get_free_page()中被调用.
+175	int swap_out(void)
+176	{
+177		static int dir_entry = FIRST_VM_PAGE >> 10;	// 即任务1的第1个目录项索引.
+178		static int page_entry = -1;
+179		int counter = VM_PAGES;						// 表示除去任务0以外的其他任务的所有页数目
+180		int pg_table;
+(gdb) 
+181	
+182		// 首先搜索页目录表,查找二级页表存在的页目录项pg_table.找到则退出循环,否则高速页目录项数对应剩余二级页表项数counter,然后继续
+183		// 检测下一项目录项.若全部搜索完还没有找到适合的(存在的)页目录项,就重新搜索.
+184		while (counter > 0) {
+185			pg_table = pg_dir[dir_entry];			// 页目录项内容.
+186			if (pg_table & 1)
+187				break;
+188			counter -= 1024;						// 1个页表对应1024个页帧
+189			dir_entry++;							// 下一目录项.
+190			// 如果整个4GB的1024个页目录项检查完了则又回到第1个任务重新开始检查
+(gdb) 
+191			if (dir_entry >= 1024)
+192				dir_entry = FIRST_VM_PAGE >> 10;
+193		}
+194		// 在取得当前目录项的页表指针后,针对该页表中的所有1024个页面,逐一调用交换函数try_to_swap_out()尝试交换出去.一旦某个页面成功交换到交换设备
+195		// 中就返回1.若对所有目录项的所有页表都已尝试失败,则显示"交换内存用完"的警告,并返回0.
+196		pg_table &= 0xfffff000;						// 页表指针(地址)(页对齐)
+197		while (counter-- > 0) {
+198			page_entry++;
+199			// 如果已经尝试处理完当前页表所有项还没有能够成功地交换出一个页面,即此时页表项索引大于等于1024,则如同前面第135-143行执行相同的处理来选出一个
+200			// 二级页表存在的页目录项,并取得相应二级页表指针.
+(gdb) 
+201			if (page_entry >= 1024) {
+202				page_entry = 0;
+203			repeat:
+204				dir_entry++;
+205				if (dir_entry >= 1024)
+206					dir_entry = FIRST_VM_PAGE >> 10;
+207				pg_table = pg_dir[dir_entry];		// 页目录项内容.
+208				if (!(pg_table & 1))
+209					if ((counter -= 1024) > 0)
+210						goto repeat;
+(gdb) 
+211					else
+212						break;
+213				pg_table &= 0xfffff000;				// 页表指针.
+214			}
+215			if (try_to_swap_out(page_entry + (unsigned long *) pg_table))
+216				return 1;
+217	        }
+218		printk("Out of swap-memory\n\r");
+219		return 0;
+220	}
+  //此函数会在第215行尝试换出，如果成功则执行第216行，再此设置断点：
+
+(gdb) b 215
+Breakpoint 3 at 0xde51: file swap.c, line 215.
+
+(gdb) b 216
+Breakpoint 4 at 0xde74: file swap.c, line 216.
+
+//设置这两个断点被捕获时自动执行的命令，来显示对应页表项的值
+(gdb) commands 3 4
+Type commands for breakpoint(s) 3 4, one per line.
+End with a line saying just "end".
+>x/wx page_entry+(unsigned long *)pg_table
+>end
+
+//先查看当前页目录
+(gdb) x/1024wx 0
+0x0 <startup_32>:       0x00001027      0x00002027      0x00003027      0x00004027
+0x10 <startup_32+16>:   0x00000000      0x00000000      0x00000000      0x00000000
+0x20 <startup_32+32>:   0x00000000      0x00000000      0x00000000      0x00000000
+0x30 <startup_32+48>:   0x00000000      0x00000000      0x00000000      0x00000000
+  //到此为进程task[0]的地址空间[0,0x4000000)
+0x40 <startup_32+64>:   0x00fde027      0x00000000      0x00000000      0x00000000
+0x50 <startup_32+80>:   0x00000000      0x00000000      0x00000000      0x00000000
+0x60 <check_x87+6>:     0x00000000      0x00000000      0x00000000      0x00000000
+0x70 <check_x87+22>:    0x00000000      0x00000000      0x00000000      0x00000000
+  //到此为进程task[1]的地址空间[0x4000000,0x8000000)
+0x80 <setup_idt+15>:    0x00fd2027      0x00000000      0x00000000      0x00000000
+0x90 <rp_sidt+2>:       0x00000000      0x00000000      0x00000000      0x00000000
+0xa0 <rp_sidt+18>:      0x00000000      0x00000000      0x00000000      0x00000000
+0xb0 <setup_gdt+15>:    0x00000000      0x00000000      0x00fd8027      0x00000000
+  //到此为进程task[2]的地址空间[0x8000000,0xc000000)
+0xc0 <setup_gdt+31>:    0x00fdd027      0x00000000      0x00000000      0x00000000
+0xd0 <setup_gdt+47>:    0x00000000      0x00000000      0x00000000      0x00000000
+0xe0 <setup_gdt+63>:    0x00000000      0x00000000      0x00000000      0x00000000
+0xf0 <setup_gdt+79>:    0x00000000      0x00000000      0x00fd7027      0x00000000
+  //到此为进程task[3]的地址空间[0xc000000,0x10000000)
+0x100 <setup_gdt+95>:   0x00f8f027      0x00b66027      0x00765027      0x00000000
+0x110 <setup_gdt+111>:  0x00f76027      0x00000000      0x00000000      0x00000000
+0x120 <setup_gdt+127>:  0x00000000      0x00000000      0x00000000      0x00000000
+0x130 <setup_gdt+143>:  0x00000000      0x00000000      0x00fb4027      0x00000000
+0x140 <setup_gdt+159>:  0x00000000      0x00000000      0x00000000      0x00000000
+  //到此为进程task[4]的地址空间[0x4000000,0x8000000)
+0x150 <setup_gdt+175>:  0x00000000      0x00000000      0x00000000      0x00000000
+***
+0xff0 <setup_gdt+3919>:	0x00000000	0x00000000	0x00000000	0x00000000
+  //其中非0的页目录项有对应的二级页表，例如task[1]只有一个二级页表0xfde000，查看其状态：
+
+(gdb) x/1024wx 0xfde000
+0xfde000:       0x00000065      0x00001025      0x00002005      0x00003005
+0xfde010:       0x00004005      0x00005065      0x00006065      0x00007025
+0xfde020:       0x00008025      0x00009025      0x0000a005      0x0000b005
+0xfde030:       0x0000c025      0x0000d025      0x0000e025      0x0000f005
+0xfde040:       0x00010025      0x00011005      0x00012005      0x00013005
+0xfde050:       0x00014005      0x00015005      0x00016005      0x00017005
+0xfde060:       0x00018025      0x00019025      0x0001a025      0x0001b025
+0xfde070:       0x0001c025      0x0001d025      0x0001e005      0x0001f025
+0xfde080:       0x00020025      0x00021005      0x00022005      0x00023005
+0xfde090:       0x00024005      0x00025025      0x00026025      0x00027025
+0xfde0a0:       0x00028025      0x00029005      0x0002a005      0x0002b005
+0xfde0b0:       0x0002c005      0x0002d005      0x0002e005      0x0002f005
+0xfde0c0:       0x00030005      0x00031005      0x00032065      0x00fdb065
+                                                                  //^此页帧的起始地址0xfdb000在0x100000（1M）以上
+0xfde0d0:       0x00fd4067      0x00035065      0x00036065      0x00037065
+                  //^此页帧的起始地址0xfd4000在0x100000（1M）以上
+0xfde0e0:       0x00038065      0x00039065      0x0003a065      0x0003b065
+0xfde0f0:       0x0003c065      0x0003d065      0x0003e065      0x0003f065
+0xfde100:       0x00040065      0x00041065      0x00042065      0x00043065
+0xfde110:       0x00044065      0x00045065      0x00046065      0x00047065
+0xfde120:       0x00048065      0x00049065      0x0004a065      0x0004b065
+0xfde130:       0x0004c065      0x0004d065      0x0004e065      0x0004f065
+0xffc140:	0x00050065	0x00051065	0x00052065	0x00053065
+0xffc150:	0x00054065	0x00055065	0x00056065	0x00057065
+0xffc160:	0x00058065	0x00059065	0x0005a065	0x0005b065
+0xffc170:	0x0005c065	0x0005d065	0x0005e065	0x0005f005
+0xffc180:	0x00060005	0x00061005	0x00062005	0x00063005
+0xffc190:	0x00064005	0x00065005	0x00066005	0x00067005
+0xffc1a0:	0x00068005	0x00069005	0x0006a005	0x0006b005
+0xffc1b0:	0x0006c005	0x0006d005	0x0006e005	0x0006f005
+0xffc1c0:	0x00070005	0x00071005	0x00072005	0x00073005
+0xffc1d0:	0x00074005	0x00075005	0x00076005	0x00077005
+0xffc1e0:	0x00078005	0x00079005	0x0007a005	0x0007b005
+0xffc1f0:	0x0007c005	0x0007d005	0x0007e005	0x0007f005
+0xffc200:	0x00080005	0x00081005	0x00082005	0x00083005
+0xffc210:	0x00084005	0x00085005	0x00086005	0x00087005
+---Type <return> to continue, or q <return> to quit---
+0xffc220:	0x00088005	0x00089005	0x0008a005	0x0008b005
+0xffc230:	0x0008c005	0x0008d005	0x0008e005	0x0008f005
+0xffc240:	0x00090025	0x00091005	0x00092005	0x00093005
+0xffc250:	0x00094005	0x00095005	0x00096005	0x00097005
+0xffc260:	0x00098005	0x00099005	0x0009a005	0x0009b005
+0xffc270:	0x0009c005	0x0009d005	0x0009e005	0x0009f005
+0xffc280:	0x00000000	0x00000000	0x00000000	0x00000000
+***
+0xffcff0:	0x00000000	0x00000000	0x00000000	0x00000000
+  //此二级页表映射的线性地址范围是[0x4000000,+0x400000)，也就是说它映射映射从0x4000开始的1024个页面；
+    //从上可知此二级页表中只有2个页帧在1M以上。
+    //在Linux 0.12中，物理内存中1M（LOW_MEM）以下的页帧存放的是内核的代码、数据和缓存，不参与交换。
+
+//查看当前所有的进程
+(gdb) p task[0]->pid
+$2 = 0
+(gdb) p task[1]->pid
+$3 = 1
+(gdb) p task[2]->pid
+$4 = 4
+  //执行程序sh，父进程是1号
+(gdb) p task[3]->pid
+$5 = 3
+  //后台进程，父进程是1号
+(gdb) p task[4]->pid
+$6 = 6
+  //执行程序swaptest，父进程是4号
+
+//继续运行
+(gdb) c
+Continuing.
+
+Breakpoint 3, swap_out () at swap.c:215
+215                     if (try_to_swap_out(page_entry + (unsigned long *) pg_table))
+1: current->pid = 6
+0xfde000:       0x00000065
+  //试图换出页面0x4000，对应虚拟地址范围[0x4000000,+0x1000)，此页面当前映射到页帧0，在1M以下
+
+//跟踪进入函数try_to_swap_out
+(gdb) step
+try_to_swap_out (table_ptr=0xfde000) at swap.c:129
+129     {
+1: current->pid = 6
+
+//查看其代码
+(gdb) list
+124	
+125	// 尝试把页面交换出去.
+126	// 若页面没有被修改过则不必保存在交换设备中,因为对应页面还可以再直接从相应映像文件中读入.于是可以直接释放掉相应物理页面了事.否则就申请一个交换页面号,然后
+127	// 把页面交换出去.此时交换页面号要保存在对应页表项中,并且仍需要保持页表项存在位P=0.参数是页表项指针.页面换或释放成功返回1,否则返回0.
+128	int try_to_swap_out(unsigned long * table_ptr)
+129	{
+130		unsigned long page;
+131		unsigned long swap_nr;
+132	
+133		// 首先判断参数的有效性.若需要交换出去的内存页面并不存在(或称无效),则即可退出.若页表项指定的物理页面地址大于分页管理的内存高端PAGING_MEMORY(15MB),
+(gdb) 
+134		// 也退出.
+135		page = *table_ptr;
+136		if (!(PAGE_PRESENT & page))
+137			return 0;
+138		if (page - LOW_MEM > PAGING_MEMORY)
+139			return 0;
+140		// 若内存页面已被修改过,但是该页面是被共享的,那么为了提高运行效率,此类页面不宜被交换出去,于是直接退出,函数返回0.否则就申请一交换页面号,并把它保存在页表
+141		// 项中,然后把页面交换出去并释放对应物理内存页面.
+142		if (PAGE_DIRTY & page) {
+143			page &= 0xfffff000;							// 取物理页面地址.
+(gdb) list
+144			if (mem_map[MAP_NR(page)] != 1)
+145				return 0;
+146			if (!(swap_nr = get_swap_page()))					// 申请交换页面号.
+147				return 0;
+148			// 对于要交换设备中的页面,相应页表项中将存放的是(swap_nr << 1).乘2(左移1位)是为了空出原来页表项的存在位(P).只有存在位P=0并且页表项内容不为0的页面才会在
+149			// 交换设备中.Intel手册中明确指出,当一个表项的存在位P=0时(无效页表项),所有其他位(位31-1)可供随意使用.下面写交换页函数write_swap_page(nr,buffer)被
+150			// 定义为ll_rw_page(WRITE,SWAP_DEV,(nr),(buffer)).
+151			*table_ptr = swap_nr << 1;
+152			invalidate();								// 刷新CPU页变换高速缓冲.
+153			write_swap_page(swap_nr, (char *) page);
+(gdb) 
+154			free_page(page);
+155			return 1;
+156		}
+157		// 否则表明页面没有修改过.那么就不用交换出去,而直接释放即可.
+158		*table_ptr = 0;
+159		invalidate();
+160		free_page(page);
+161		return 1;
+162	}
+  //此函数如果成功，会执行到第151行（成功换出）或第158行（不需换出、直接释放），在此设置断点：
+
+(gdb) b 151
+Breakpoint 5 at 0xdce1: file swap.c, line 151.
+(gdb) b 158
+Breakpoint 6 at 0xdd27: file swap.c, line 158.
+
+//并使这两个断点被捕获时自动显示对应页表项的值（修改前）
+(gdb) commands 5 6
+Type commands for breakpoint(s) 5 6, one per line.
+End with a line saying just "end".
+>x/wx table_ptr
+>end
+
+//查看此时的交换空间状态
+(gdb) x/4096bx swap_bitmap 
+0xfdc000:       0xfe    0xff    0xff    0xff    0xff    0xff    0xff    0xff
+0xfdc008:       0xff    0xff    0xff    0xff    0xff    0xff    0xff    0xff
+0xfdc010:       0xff    0xff    0xff    0xff    0xff    0xff    0xff    0xff
+0xfdc018:       0xff    0xff    0xff    0xff    0xff    0xff    0xff    0xff
+***
+0xfdc3b0:       0xff    0xff    0xff    0xff    0xff    0xff    0xff    0xff
+0xfdc3b8:       0x3f    0x00    0x00    0x00    0x00    0x00    0x00    0x00
+0xfdc3c0:       0x00    0x00    0x00    0x00    0x00    0x00    0x00    0x00
+0xfdc3c8:       0x00    0x00    0x00    0x00    0x00    0x00    0x00    0x00
+0xfdc3d0:	0x00	0x00	0x00	0x00	0x00	0x00	0x00	0x00
+***
+0xfdcff8:	0x00	0x00	0x00	0x00	0x00	0x00	0x00	0x00
+  //可见此位图与我们最开始观察到的硬盘交换分区的位图是一致的。
+  //其中为1的位表明对应的交换页是可用的，可见0号交换页不可用（是用于管理交换空间的位图）
+
+//继续运行
+(gdb) c
+Continuing.
+
+Breakpoint 3, swap_out () at swap.c:215
+215                     if (try_to_swap_out(page_entry + (unsigned long *) pg_table))
+1: current->pid = 6
+0xfde004:       0x00001025
+  //接着尝试换出页面0x4001
+
+//现在暂时关闭断点3，并继续
+(gdb) disable 3
+(gdb) c
+Continuing.
+
+Breakpoint 5, try_to_swap_out (table_ptr=0xfde0cc) at swap.c:151
+151                     *table_ptr = swap_nr << 1;
+1: current->pid = 6
+0xfde0cc:       0x00fdb065
+  //可见页帧0xfdb（对应页面0x4033）的内容即将被换出，查看申请到的交换页：
+
+(gdb) p swap_nr
+$7 = 1
+  //1号交换页
+
+//继续
+(gdb) c
+Continuing.
+
+Breakpoint 4, swap_out () at swap.c:216
+216                             return 1;
+1: current->pid = 6
+0xfde0cc:       0x00000002
+  //此时页面0x4033已换出，放在了1号（=0x2>>1）交换页，可查看交换位图：
+
+(gdb) x/32bx swap_bitmap
+0xfdc000:       0xfc    0xff    0xff    0xff    0xff    0xff    0xff    0xff
+0xfdc008:       0xff    0xff    0xff    0xff    0xff    0xff    0xff    0xff
+0xfdc010:       0xff    0xff    0xff    0xff    0xff    0xff    0xff    0xff
+0xfdc018:       0xff    0xff    0xff    0xff    0xff    0xff    0xff    0xff
+  //可见0xfc中的1号位也变成了0（已分配）
+
+//原来的页帧0xfdb重新变成了空闲状态：
+(gdb) p mem_map[0xfdb-0x100]
+$8 = 0 '\000'
+  //0表示没有被任何页面所映射
+
+//继续
+(gdb) c
+Continuing.
+
+Breakpoint 2, swap_out () at swap.c:176
+176     {
+1: current->pid = 6
+  //又一次发生换出（第2次），查看调用栈：
+
+(gdb) bt
+#0  swap_out () at swap.c:176
+#1  0x0000df10 in get_free_page () at swap.c:263
+#2  0x0000d10b in get_empty_page (address=280391680) at memory.c:475
+#3  0x0000d53f in do_no_page (error_code=6, address=280391680) at memory.c:678
+#4  0x0000e1b5 in page_fault ()
+#5  0x00000006 in startup_32 ()
+Backtrace stopped: Cannot access memory at address 0x3bffef4
+
+(gdb) p/x 280391680
+$9 = 0x10b67000
+  //可见是在访问页面0x10b67时引发了页故障和换出动作
+
+//继续，分析这次换出的结果：
+(gdb) c
+Continuing.
+
+Breakpoint 5, try_to_swap_out (table_ptr=0xfde0d0) at swap.c:151
+151                     *table_ptr = swap_nr << 1;
+1: current->pid = 6
+0xfde0d0:       0x00fd4067
+  //此页表项对应页面0x4034（=0x4000+0xd0/4）
+
+(gdb) c
+Continuing.
+
+Breakpoint 4, swap_out () at swap.c:216
+216                             return 1;
+1: current->pid = 6
+0xfde0d0:       0x00000004
+  //可见这次换出的是页面0x4034，放在了交换页2（=0x4>>1）
+
+//再次查看
+(gdb) x/32bx swap_bitmap
+0xfdc000:	0xf8	0xff	0xff	0xff	0xff	0xff	0xff	0xff
+0xfdc008:	0xff	0xff	0xff	0xff	0xff	0xff	0xff	0xff
+0xfdc010:	0xff	0xff	0xff	0xff	0xff	0xff	0xff	0xff
+0xfdc018:	0xff	0xff	0xff	0xff	0xff	0xff	0xff	0xff
+  //可见2号交换页也已被分配
+
+//思考：Linux 0.11采用的是什么页面替换算法？下一个被换出的页面会是几号？

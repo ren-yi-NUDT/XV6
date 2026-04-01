@@ -1,0 +1,545 @@
+//目的：分析进程的空闲空间管理（分配与释放）。
+
+//被分析程序va3.c:
+------------------------------{
+#include "kernel/types.h"
+#include "kernel/stat.h"
+#include "user/user.h"
+
+int
+main (int argc, char *argv[])
+{
+  void *p1, *p2, *p3; 
+  printf ("location of malloc(0x1000) : %p\n", (p1 = malloc (0x1000)));
+  printf ("location of malloc(0x10000) : %p\n", (p2 = malloc (0x10000)));
+  free(p2);
+  printf ("location of malloc(0x100) : %p\n", (p3 = malloc (0x100)));
+  free(p1);
+  free(p3);
+  return 0;
+}
+------------------------------}
+
+demo@ali4nudtOS:~/os/lab$ ./mygdb
+GNU gdb (Ubuntu 12.1-0ubuntu1~22.04.2) 12.1
+Copyright (C) 2022 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Type "show copying" and "show warranty" for details.
+This GDB was configured as "x86_64-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<https://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+    <http://www.gnu.org/software/gdb/documentation/>.
+
+For help, type "help".
+Type "apropos word" to search for commands related to "word".
+GDBTARGET = localhost:26001
+0x0000000000001000 in ?? ()
+The target architecture is set to "riscv:rv64".
+Breakpoint 1 at 0x8000008c: file kernel/start.c, line 22.
+Breakpoint 2 at 0x80002520: file kernel/proc.c, line 660.
+
+//跟踪到va3的运行
+(gdb) b exec
+Breakpoint 3 at 0x80004bb0: file kernel/exec.c, line 24.
+
+(gdb) c
+Continuing.
+
+Breakpoint 1, start () at kernel/start.c:22
+22      {
+1: $priv = 3
+2: /x cpus[$mhartid].proc = 0x0
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x30>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x158>
+
+(gdb)
+Continuing.
+
+Breakpoint 3, exec (path=path@entry=0x3fffffdf00 "/init", argv=argv@entry=0x3fffffde00) at kernel/exec.c:24
+24      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80010fe0
+3: cpus[$mhartid].proc.pid = 1
+4: cpus[$mhartid].proc.name = "initcode\000\000\000\000\000\000\000"
+
+(gdb) c
+Continuing.
+
+Breakpoint 3, exec (path=path@entry=0x3fffffbf00 "sh", argv=argv@entry=0x3fffffbe00) at kernel/exec.c:24
+24      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80011148
+3: cpus[$mhartid].proc.pid = 2
+4: cpus[$mhartid].proc.name = "init", '\000' <repeats 11 times>
+
+(gdb) c
+Continuing.
+
+------------------------{
+xv6 kernel is booting
+
+init: starting sh
+$ va3
+
+------------------------}
+
+Breakpoint 3, exec (path=path@entry=0x3fffff9f00 "va3", argv=argv@entry=0x3fffff9e00) at kernel/exec.c:24
+24      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x800112b0
+3: cpus[$mhartid].proc.pid = 3
+4: cpus[$mhartid].proc.name = "sh", '\000' <repeats 13 times>
+
+//加载va3的符号
+(gdb) add-symbol-file user/tests/_va3 0
+add symbol table from file "user/tests/_va3" at
+        .text_addr = 0x0
+Reading symbols from user/tests/_va3...
+
+//跟踪到exec系统调用执行完
+(gdb) b usertrapret
+Breakpoint 4 at 0x8000267a: file kernel/trap.c, line 91.
+
+(gdb) c
+Continuing.
+
+Breakpoint 4, usertrapret () at kernel/trap.c:91
+91      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x800112b0
+3: cpus[$mhartid].proc.pid = 3
+4: cpus[$mhartid].proc.name = "va3", '\000' <repeats 12 times>
+
+//查看3号进程（va3）的初始break
+(gdb) p/x cpus[0].proc->sz
+$1 = 0x4000
+  //此时进程地址空间中包含4个有效页面，分别是：代码段、数据段、guard页、栈，还没有堆，可查看地址空间布局：
+
+(gdb) info files
+Symbols from "/home/os/lab/kernel/kernel".
+Remote target using gdb-specific protocol:
+        `/home/os/lab/kernel/kernel', file type elf64-littleriscv.
+        Entry point: 0x80000000
+        0x0000000080000000 - 0x0000000080008000 is .text
+        0x0000000080008000 - 0x0000000080008868 is .rodata
+        0x0000000080008868 - 0x00000000800088b4 is .data
+        0x00000000800088b8 - 0x00000000800088c8 is .got
+        0x00000000800088c8 - 0x00000000800088d8 is .got.plt
+        0x00000000800088e0 - 0x0000000080021dc0 is .bss
+        0x0000000000000000 - 0x00000000000009d6 is .text in /home/os/lab/user/tests/_va3
+        0x00000000000009d8 - 0x0000000000001000 is .rodata in /home/os/lab/user/tests/_va3
+        0x0000000000001000 - 0x0000000000001018 is .bss in /home/os/lab/user/tests/_va3
+        While running this, GDB does not access memory from...
+Local exec file:
+        `/home/os/lab/kernel/kernel', file type elf64-littleriscv.
+        Entry point: 0x80000000
+        0x0000000080000000 - 0x0000000080008000 is .text
+        0x0000000080008000 - 0x0000000080008868 is .rodata
+        0x0000000080008868 - 0x00000000800088b4 is .data
+        0x00000000800088b8 - 0x00000000800088c8 is .got
+        0x00000000800088c8 - 0x00000000800088d8 is .got.plt
+        0x00000000800088e0 - 0x0000000080021dc0 is .bss
+        0x0000000000000000 - 0x00000000000009d6 is .text in /home/os/lab/user/tests/_va3
+        0x00000000000009d8 - 0x0000000000001000 is .rodata in /home/os/lab/user/tests/_va3
+        0x0000000000001000 - 0x0000000000001018 is .bss in /home/os/lab/user/tests/_va3
+
+//分析第一次malloc
+(gdb) disable 4
+(gdb) b malloc
+Breakpoint 5 at 0x8a8: file user/umalloc.c, line 69.
+
+(gdb) c
+Continuing.
+
+Breakpoint 5, malloc (nbytes=4096) at user/umalloc.c:69
+69        nunits = (nbytes + sizeof(Header) - 1)/sizeof(Header) + 1;
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+  //第一次malloc开始执行，查看此时的空闲块链表：
+
+(gdb) p freep
+$2 = (Header *) 0x0 <main>
+  //此时链表为空
+
+(gdb) p base
+$3 = {s = {ptr = 0x0 <main>, size = 0}, x = 0}
+  //此为基本节点，空闲块链表刚初始化时只有这一个节点。
+
+(gdb) p &base
+$4 = (Header *) 0x1000 <base>
+  //此节点在数据段中（1号页面内）
+
+(gdb) b free
+Breakpoint 6 at 0x702: file user/umalloc.c, line 29.
+  //同时跟踪free函数
+
+(gdb) c
+Continuing.
+
+Breakpoint 6, free (ap=0x4010) at user/umalloc.c:29
+29        bp = (Header*)ap - 1;
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+  //第一次malloc执行过程中调用了函数free，这是因为初始没有堆空间，所以先调用sbrk获取内存，
+    //然后调用free将申请到可内存块放入空闲块链表，申请的内存区间为[0x4000,0x14000)，
+    //其中[0x4000,0x4010)为块头、[0x4010,0x14000)为空闲块。可查看调用关系:
+
+(gdb) bt
+#0  free (ap=0x4010) at user/umalloc.c:29
+#1  0x0000000000000886 in morecore (nu=4096) at user/umalloc.c:59
+#2  0x00000000000009aa in malloc (nbytes=4096) at user/umalloc.c:87
+#3  0x0000000000000016 in main (argc=<optimized out>, argv=<optimized out>) at user/tests/va3.c:9
+#4  0x00000000000000a4 in _main () at user/ulib.c:13
+#5  0x0000000000000100 in strlen (s=0x4010 "") at user/ulib.c:41
+Backtrace stopped: frame did not save the PC
+
+//分析增加新空闲块之前的空闲块链表
+(gdb) p freep
+$5 = (Header *) 0x1000 <base>
+  //已经初始化
+
+(gdb) p base
+$6 = {s = {ptr = 0x1000 <base>, size = 0}, x = 4096}
+  //此时链表中只有一个节点：base，构成一个双向链表。
+
+//跟踪到此次free调用结束
+(gdb) finish
+Run till exit from #0  free (ap=0x4010) at user/umalloc.c:29
+morecore (nu=4096) at user/umalloc.c:60
+60        return freep;
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+
+//观察此时的空闲块链表
+(gdb) p freep
+$7 = (Header *) 0x1000 <base>
+  //头节点没变
+
+(gdb) p freep->s.ptr
+$8 = (union header *) 0x4000
+  //增加了一个节点，即节点2
+
+(gdb) p/x freep->s.ptr->s.size
+$9 = 0x1000
+  //0x1000是新节点的长度信息，以16字节（块头的长度）为单位，新节点的实际长度是0x10000字节，
+  //新增节点的范围是[0x4000,0x14000)
+
+(gdb) p freep->s.ptr->s.ptr
+$10 = (union header *) 0x1000 <base>
+  //新节点的下一节点绕回到了base
+
+//继续运行
+(gdb) c
+Continuing.
+
+Breakpoint 5, malloc (nbytes=65536) at user/umalloc.c:69
+69        nunits = (nbytes + sizeof(Header) - 1)/sizeof(Header) + 1;
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+  //这是第2次malloc调用，第一次（请求0x1000字节）已处理完，这第二次是请求0x10000字节：
+
+(gdb) p/x nbytes
+$11 = 0x10000
+
+//查看现在的空闲块链表
+(gdb) p freep
+$12 = (Header *) 0x1000 <base>
+  //头节点没变，依然是base
+
+(gdb) p freep->s.size
+$13 = 0
+  //base的大小也没变
+
+(gdb) p freep->s.ptr
+$14 = (union header *) 0x4000
+  //节点2的起始位置没变
+
+(gdb) p/x freep->s.ptr->s.size
+$15 = 0xeff
+  //节点2的长度变为了0xeff个单位，实际长度是0xeff0字节，
+    //这个长度包括了块头，块头的位置还是[0x4000,0x4010)，该空闲块的位置是[0x4010,0x12ff0)，
+    //可见节点2已经拆分出了一部分给第一次malloc，拆出的节点地址范围是[0x12ff0,0x14000)，
+    //其中[0x12ff0,0x13000)是块头，[0x13000,0x14000)是空闲块，已被分配给用户使用。
+
+//查看第2个节点的下一节点
+(gdb) p/x freep->s.ptr->s.ptr
+$16 = 0x1000
+  //是节点1，即base节点
+
+//继续跟踪
+(gdb) c
+Continuing.
+
+Breakpoint 6, free (ap=0x14010) at user/umalloc.c:29
+29        bp = (Header*)ap - 1;
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+  //类似地，第2次malloc执行中也向内核请求了内存，并通过free将其放入空闲块列表：
+
+(gdb) bt
+#0  free (ap=0x14010) at user/umalloc.c:29
+#1  0x0000000000000886 in morecore (nu=4097) at user/umalloc.c:59
+#2  0x00000000000009aa in malloc (nbytes=65536) at user/umalloc.c:87
+#3  0x0000000000000034 in main (argc=<optimized out>, argv=<optimized out>) at user/tests/va3.c:10
+#4  0x00000000000000a4 in _main () at user/ulib.c:13
+#5  0x0000000000000100 in strlen (s=0x14010 "") at user/ulib.c:41
+Backtrace stopped: frame did not save the PC
+
+//跟踪到free执行完
+(gdb) finish
+Run till exit from #0  free (ap=0x14010) at user/umalloc.c:29
+morecore (nu=4097) at user/umalloc.c:60
+60        return freep;
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+
+//查看此时的链表
+(gdb) p freep
+$17 = (Header *) 0x4000
+  //头节点已经变化，调整为了原来的节点2
+
+(gdb) p/x freep->s.size
+$18 = 0xeff
+  //此节点的长度没变化
+
+(gdb) p freep->s.ptr
+$19 = (union header *) 0x14000
+  //此为新的第2个节点的起始位置
+
+(gdb) p/x freep->s.ptr->s.size
+$20 = 0x1001
+  //新节点2的长度信息（以16字节为单位），实际长度是0x10010字节，这能满足第2次malloc请求（0x10000字节），
+    //同时还多分配了16字节来记录块头，因此节点2的内存范围是[0x14000,0x24010)。
+
+(gdb) p freep->s.ptr->s.ptr
+$21 = (union header *) 0x1000 <base>
+  //节点3是base
+
+(gdb) p freep->s.ptr->s.ptr->s.size
+$22 = 0
+  //base的长度没变
+
+(gdb) p freep->s.ptr->s.ptr->s.ptr
+$23 = (union header *) 0x4000
+  //节点3的下一节点是现在的第1个节点，已经绕回。
+   //现在链表中有2个有效的空闲块（节点1和2）
+
+//继续运行
+(gdb) c
+Continuing.
+
+Breakpoint 6, free (ap=0x14010) at user/umalloc.c:29
+29        bp = (Header*)ap - 1;
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+  //这是程序va3.c中的第一条free语句("free(p2);")在执行，第2次malloc已经执行完，查看此时的链表：
+
+(gdb) p freep
+$24 = (Header *) 0x4000
+  //节点1没变
+
+(gdb) p freep->s.ptr
+$25 = (union header *) 0x1000 <base>
+  //节点2是base，原来的节点2已经被分配出去，现在即将进行的是释放刚分配出去的内存块[0x14010,0x24010)。
+
+//跟踪到free结束
+(gdb) finish
+Run till exit from #0  free (ap=0x14010) at user/umalloc.c:29
+main (argc=<optimized out>, argv=<optimized out>) at user/tests/va3.c:12
+12        printf ("location of malloc(0x100) : %p\n", (p3 = malloc (0x100)));
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+
+//再次参看链表
+(gdb) p freep
+$26 = (Header *) 0x4000
+  //节点1没变
+(gdb) p/x freep->s.size
+$27 = 0xeff
+  //节点1的长度是0xeff0字节
+
+(gdb) p freep->s.ptr
+$28 = (union header *) 0x14000
+  //节点2变成了刚释放的内存块，其块头是[0x14000,0x14010)
+
+(gdb) p/x freep->s.ptr->s.size
+$29 = 0x1001
+  //节点2的长度是0x10010字节，包括块头
+
+(gdb) p freep->s.ptr->s.ptr
+$30 = (union header *) 0x1000 <base>
+  //节点3是base
+
+(gdb) p freep->s.ptr->s.ptr->s.ptr
+$31 = (union header *) 0x4000
+  //节点3的下一节点是节点1，已经绕回，因此现在base是最后一个节点
+
+(gdb) c
+Continuing.
+
+Breakpoint 5, malloc (nbytes=256) at user/umalloc.c:69
+69        nunits = (nbytes + sizeof(Header) - 1)/sizeof(Header) + 1;
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+  //这是第3次malloc，请求0x100个字节：
+
+(gdb) p/x nbytes
+$32 = 0x100
+
+(gdb) p freep
+$33 = (Header *) 0x4000
+
+(gdb) p/x freep->s.size
+$34 = 0xeff
+
+(gdb) p freep->s.ptr
+$35 = (union header *) 0x14000
+
+(gdb) p/x freep->s.ptr->s.size
+$36 = 0x1001
+
+(gdb) p freep->s.ptr->s.ptr
+$37 = (union header *) 0x1000 <base>
+
+(gdb) p freep->s.ptr->s.ptr->s.ptr
+$38 = (union header *) 0x4000
+
+  //可见空闲块链表没变，其中节点1和2都能满足这次malloc请求
+
+//跟踪到第3次malloc执行完
+(gdb) finish
+Run till exit from #0  malloc (nbytes=256) at user/umalloc.c:69
+0x000000000000005e in main (argc=<optimized out>, argv=<optimized out>) at user/tests/va3.c:12
+12        printf ("location of malloc(0x100) : %p\n", (p3 = malloc (0x100)));
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+Value returned is $28 = (void *) 0x23f10
+
+(gdb) p freep
+$39 = (Header *) 0x4000
+
+(gdb) p/x freep->s.size
+$40 = 0xeff
+  //节点1没变
+
+(gdb) p freep->s.ptr
+$41 = (union header *) 0x14000
+
+(gdb) p/x freep->s.ptr->s.size
+$42 = 0xff0
+  //节点2的长度减小了0x11个单位，原来是0x1001个单位，这次malloc是请求0x100字节（0x10个单位），
+    //表示块头也需要1个单位，因此节点2共减小0x11个单位，减小的内存范围是[0x14000+0xff00,0x14000+0x10010)，
+    //即[0x23f00,0x24010)，去掉块头后实际给用户的是内存块[0x23f10,0x24010)，由程序中的变量p3所指向。
+
+(gdb) p freep->s.ptr->s.ptr
+$43 = (union header *) 0x1000 <base>
+
+(gdb) p freep->s.ptr->s.ptr->s.ptr
+$44 = (union header *) 0x4000
+  //链表的其他部分没变
+
+//继续运行
+(gdb) c
+Continuing.
+
+Breakpoint 6, free (ap=0x13000) at user/umalloc.c:29
+29        bp = (Header*)ap - 1;
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+  //这是执行程序va3.c中的第2个free语句("free(p1);")，要释放前面分配的内存块[0x13000,0x14000)，
+  //该内存块的块头位于[0x12ff0,0x13000)。
+    //跟踪到其执行完：
+
+(gdb) finish
+Run till exit from #0  free (ap=0x13000) at user/umalloc.c:29
+main (argc=<optimized out>, argv=<optimized out>) at user/tests/va3.c:14
+14        free(p3);
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+
+//查看释放之后的空闲块链表
+(gdb) p freep
+$45 = (Header *) 0x4000
+
+(gdb) p/x freep->s.size
+$46 = 0x1ff0
+  //可见现在的节点1已经包括了原来的节点1[0x4000,0x12ff0=0x4000+0xeff0)、节点2[0x14000,0x23f00=0x14000+0xff00)和
+    //刚才释放的节点[0x12ff0,0x14000)的内存，即[0x4000,0x23f00=0x4000+0x1ff00)。
+
+(gdb) p freep->s.ptr
+$47 = (union header *) 0x1000 <base>
+  //节点2是base
+
+(gdb) c
+Continuing.
+
+Breakpoint 6, free (ap=0x23f10) at user/umalloc.c:29
+29        bp = (Header*)ap - 1;
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+  //这是程序va3.c中的第3条free语句在执行，要释放前面分配的内存块[0x23f10,0x24010)，其块头位于[0x23f00,0x23f10)。
+
+(gdb) finish
+Run till exit from #0  free (ap=0x23f10) at user/umalloc.c:29
+main (argc=<optimized out>, argv=<optimized out>) at user/tests/va3.c:15
+15        return 0;
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010be0>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010be0>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010be0>
+
+//查看第3次释放之后的链表
+(gdb) p freep
+$48 = (Header *) 0x4000
+
+(gdb) p/x freep->s.size
+$49 = 0x2001
+  //节点1的内存范围变成了[0x4000,0x24010=0x4000+0x20010)，已经合并了新释放的节点。
+
+(gdb) p freep->s.ptr
+$50 = (union header *) 0x1000 <base>
+
+(gdb) p freep->s.ptr->s.size
+$51 = 0
+  //节点2是base
+
+(gdb) p freep->s.ptr->s.ptr
+$52 = (union header *) 0x4000
+  //节点2的后继是节点1，释放了所有已分配内存后，空闲块链表中只有一个块，其大小是0x20010字节；
+    //第1次malloc时向内核申请了0x10000字节（这是每次增加的最小值），第2次malloc时向内核申请了
+    //0x10010字节（含0x10字节的块头），两次共申请了0x20010字节，现在都已空闲。
+
+(gdb) kill
+[Inferior 1 (process 1) killed]
+
+(gdb) quit

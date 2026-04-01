@@ -94,19 +94,19 @@ Breakpoint 3, exec (path=path@entry=0x3fffff9f00 "loop", argv=argv@entry=0x3ffff
   //可见即将执行loop程序
 
 //现在加载loop的符号文件
-(gdb) add-symbol-file user/_loop 0
-add symbol table from file "user/_loop" at
+(gdb) add-symbol-file user/tests/_loop 0
+add symbol table from file "user/tests/_loop" at
         .text_addr = 0x0
-Reading symbols from user/_loop...
+Reading symbols from user/tests/_loop...
 
 //然后在loop程序的开始点设断点，并跟踪过去
 (gdb) b *0x0
-Breakpoint 4 at 0x0: file user/loop.c, line 8.
+Breakpoint 4 at 0x0: file user/tests/loop.c, line 8.
 
 (gdb) c
 Continuing.
 
-Breakpoint 4, main (argc=0, argv=0x0 <main>) at user/loop.c:8
+Breakpoint 4, main (argc=0, argv=0x0 <main>) at user/tests/loop.c:8
 8       {
 1: $priv = 0
 2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010b80>
@@ -197,11 +197,11 @@ $2 = 0x24
 
 //现在跟踪到该恢复点
 (gdb) b *0x24
-Breakpoint 7 at 0x24: file user/loop.c, line 10.
+Breakpoint 7 at 0x24: file user/tests/loop.c, line 10.
 
 (gdb) stepi
 
-Breakpoint 7, 0x0000000000000024 in main (argc=1, argv=0x3fe0) at user/loop.c:10
+Breakpoint 7, 0x0000000000000024 in main (argc=1, argv=0x3fe0) at user/tests/loop.c:10
 10          counter++;
 1: $priv = 0
 2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010b80>

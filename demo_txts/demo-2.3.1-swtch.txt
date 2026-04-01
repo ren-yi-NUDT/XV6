@@ -1,0 +1,499 @@
+//目的：分析xv6的进程切换过程（从5号进程（loop)到4号进程（loop&)）。
+
+//以调试模式启动qemu虚拟机
+demo@ali4nudtOS:/home/os/lab$ make qemu-gdb
+cp fs.img ~/
+*** Now run 'gdb' in another window.
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 1  -nographic -global virtio-mmio.force-legacy=false -drive file=/home/demo/fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -S -gdb tcp::26129
+
+
+//现在*切换到另一个Windows命令行窗口*，然后再次登录云服务
+F:\tmp>ssh demo@47.122.113.125
+...
+
+//启动gdb
+demo@ali4nudtOS:/home/os/lab$ ./mygdb
+GNU gdb (Ubuntu 12.1-0ubuntu1~22.04.2) 12.1
+Copyright (C) 2022 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Type "show copying" and "show warranty" for details.
+This GDB was configured as "x86_64-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<https://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+    <http://www.gnu.org/software/gdb/documentation/>.
+
+For help, type "help".
+Type "apropos word" to search for commands related to "word".
+GDBTARGET = localhost:26129
+0x0000000000001000 in ?? ()
+The target architecture is set to "riscv:rv64".
+Breakpoint 1 at 0x8000008c: file kernel/start.c, line 22.
+Breakpoint 2 at 0x80002508: file kernel/proc.c, line 660.
+
+//跟踪到执行命令解释器
+(gdb) b exec
+Breakpoint 3 at 0x80004b3a: file kernel/exec.c, line 24.
+
+(gdb) c
+Continuing.
+
+Breakpoint 1, start () at kernel/start.c:22
+22      {
+1: $priv = 3
+2: /x cpus[$mhartid].proc = 0x0
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x30>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x158>
+
+(gdb) c
+Continuing.
+
+Breakpoint 3, exec (path=path@entry=0x3fffffdf00 "/init", argv=argv@entry=0x3fffffde00) at kernel/exec.c:24
+24      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80010f80
+3: cpus[$mhartid].proc.pid = 1
+4: cpus[$mhartid].proc.name = "initcode\000\000\000\000\000\000\000"
+
+(gdb) c
+Continuing.
+
+Breakpoint 3, exec (path=path@entry=0x3fffffbf00 "sh", argv=argv@entry=0x3fffffbe00) at kernel/exec.c:24
+24      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x800110e8
+3: cpus[$mhartid].proc.pid = 2
+4: cpus[$mhartid].proc.name = "init", '\000' <repeats 11 times>
+
+(gdb) c
+Continuing.
+
+//切换到qemu终端，输入命令"loop&"，在后台（进程4）运行程序loop：
+-------------------------------{
+xv6 kernel is booting
+
+init: starting sh
+$ loop&
+
+-------------------------------}
+
+//切换回gdb终端，可见：
+Breakpoint 3, exec (path=path@entry=0x3fffff7f00 "loop", argv=argv@entry=0x3fffff7e00) at kernel/exec.c:24
+24      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x800113b8
+3: cpus[$mhartid].proc.pid = 4
+4: cpus[$mhartid].proc.name = "sh", '\000' <repeats 13 times>
+
+//继续运行
+(gdb) c
+Continuing.
+
+//在qemu终端输入命令"loop"，这将创建进程5来运行loop
+-------------------------------{
+xv6 kernel is booting
+
+init: starting sh
+$ loop&
+$ loop
+
+-------------------------------}
+
+//还是切换回gdb终端，可见：
+Breakpoint 3, exec (path=path@entry=0x3fffff9f00 "loop", argv=argv@entry=0x3fffff9e00) at kernel/exec.c:24
+24      {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80011250
+3: cpus[$mhartid].proc.pid = 5
+4: cpus[$mhartid].proc.name = "sh", '\000' <repeats 13 times>
+  //5号进程开始执行程序loop，现在加载其符号信息，并跟踪到第1条指令：
+
+(gdb) add-symbol-file user/tests/_loop 0
+add symbol table from file "user/tests/_loop" at
+        .text_addr = 0x0
+Reading symbols from user/tests/_loop...
+
+(gdb) b *0x0
+Breakpoint 4 at 0x0: file user/tests/loop.c, line 8.
+
+(gdb) c
+Continuing.
+
+Breakpoint 4, main (argc=0, argv=0x0 <main>) at user/tests/loop.c:8
+8       {
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010b80>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010b80>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010b80>
+
+//查看汇编指令
+(gdb) disassemble
+Dump of assembler code for function main:
+=> 0x0000000000000000 <+0>:     addi    sp,sp,-32
+   0x0000000000000002 <+2>:     sd      s0,24(sp)
+   0x0000000000000004 <+4>:     addi    s0,sp,32
+   0x0000000000000006 <+6>:     mv      a5,a0
+   0x0000000000000008 <+8>:     sd      a1,-32(s0)
+   0x000000000000000c <+12>:    sw      a5,-20(s0)
+   0x0000000000000010 <+16>:    auipc   a5,0x1
+   0x0000000000000014 <+20>:    addi    a5,a5,-16 # 0x1000 <counter>
+   0x0000000000000018 <+24>:    lw      a5,0(a5)
+   0x000000000000001a <+26>:    addiw   a5,a5,1
+   0x000000000000001c <+28>:    sext.w  a4,a5
+   0x0000000000000020 <+32>:    auipc   a5,0x1
+   0x0000000000000024 <+36>:    addi    a5,a5,-32 # 0x1000 <counter>
+   0x0000000000000028 <+40>:    sw      a4,0(a5)
+   0x000000000000002a <+42>:    j       0x10 <main+16>
+End of assembler dump.
+  //其中0x10~0x2a为while循环
+
+//现在首先跟踪到进程调度（sched）的开始
+(gdb) b sched
+Breakpoint 5 at 0x80001f42: file kernel/proc.c, line 483.
+
+(gdb) p/x $satp
+$1 = 0x8000000000087f4a
+  //$satp寄存器记录的是页表所在页面的页号，代表了当前的地址空间（5号进程的）
+
+(gdb) c
+Continuing.
+
+Breakpoint 5, sched () at kernel/proc.c:483
+483     {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80011250
+3: cpus[$mhartid].proc.pid = 5
+4: cpus[$mhartid].proc.name = "loop", '\000' <repeats 11 times>
+  //可见一次进程调度开始了
+
+//再次查看页表的页号
+(gdb) p/x $satp
+$2 = 0x8000000000087fff
+  //可见已经改变，现在用的是内核的页表
+
+//分析当前这次进程调度是怎么产生的
+(gdb) bt
+#0  sched () at kernel/proc.c:483
+#1  0x0000000080002040 in yield () at kernel/proc.c:508
+#2  0x00000000800028ee in usertrap () at kernel/trap.c:81
+#3  0x000000000000003c in _main () at user/ulib.c:13
+Backtrace stopped: previous frame inner to this frame (corrupt stack?)
+  //可见是陷阱引发的，查看具体代码：
+
+(gdb) frame 2
+#2  0x00000000800028ee in usertrap () at kernel/trap.c:81
+81          yield();
+
+(gdb) list
+76        if(killed(p))
+77          exit(-1);
+78
+79        // give up the CPU if this is a timer interrupt.
+80        if(which_dev == 2)
+81          yield();
+82
+83        usertrapret();
+84      }
+85
+  //可见是第81行引发，当时判断出是发生了时钟中断，所以剥夺当前进程的运行，
+    //可查看$scause寄存器来确认：
+
+(gdb) p/x $scause
+$3 = 0x8000000000000001
+  //这个值代表软件中断，实际是由时钟中断处理程序（在M模式）安排的
+
+//切换回当前栈帧，查看sched的代码：
+(gdb) frame 0
+#0  sched () at kernel/proc.c:483
+483     {
+
+(gdb) list
+478     // be proc->intena and proc->noff, but that would
+479     // break in the few places where a lock is held but
+480     // there's no process.
+481     void
+482     sched(void)
+483     {
+484       int intena;
+485       struct proc *p = myproc();
+486
+487       if(!holding(&p->lock))
+(gdb)
+488         panic("sched p->lock");
+489       if(mycpu()->noff != 1)
+490         panic("sched locks");
+491       if(p->state == RUNNING)
+492         panic("sched running");
+493       if(intr_get())
+494         panic("sched interruptible");
+495
+496       intena = mycpu()->intena;
+497       swtch(&p->context, &mycpu()->context);
+(gdb)
+498       mycpu()->intena = intena;
+499     }
+  //可见此函数将在第497行进行上下文切换，切到内核调度线程，跟踪过去：
+
+(gdb) b swtch
+Breakpoint 6 at 0x800025b8
+
+(gdb) c
+Continuing.
+
+Breakpoint 6, 0x00000000800025b8 in swtch ()
+=> 0x00000000800025b8 <swtch+0>:        23 30 15 00    sd       ra,0(a0)
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80011250
+3: cpus[$mhartid].proc.pid = 5
+4: cpus[$mhartid].proc.name = "loop", '\000' <repeats 11 times>
+  //开始切换上下文，查看汇编代码：
+
+(gdb) disassemble
+Dump of assembler code for function swtch:
+=> 0x00000000800025b8 <+0>:     sd      ra,0(a0)
+   0x00000000800025bc <+4>:     sd      sp,8(a0)
+   0x00000000800025c0 <+8>:     sd      s0,16(a0)
+   0x00000000800025c2 <+10>:    sd      s1,24(a0)
+   0x00000000800025c4 <+12>:    sd      s2,32(a0)
+   0x00000000800025c8 <+16>:    sd      s3,40(a0)
+   0x00000000800025cc <+20>:    sd      s4,48(a0)
+   0x00000000800025d0 <+24>:    sd      s5,56(a0)
+   0x00000000800025d4 <+28>:    sd      s6,64(a0)
+   0x00000000800025d8 <+32>:    sd      s7,72(a0)
+   0x00000000800025dc <+36>:    sd      s8,80(a0)
+   0x00000000800025e0 <+40>:    sd      s9,88(a0)
+   0x00000000800025e4 <+44>:    sd      s10,96(a0)
+   0x00000000800025e8 <+48>:    sd      s11,104(a0)
+   0x00000000800025ec <+52>:    ld      ra,0(a1)
+   0x00000000800025f0 <+56>:    ld      sp,8(a1)
+   0x00000000800025f4 <+60>:    ld      s0,16(a1)
+   0x00000000800025f6 <+62>:    ld      s1,24(a1)
+   0x00000000800025f8 <+64>:    ld      s2,32(a1)
+   0x00000000800025fc <+68>:    ld      s3,40(a1)
+   0x0000000080002600 <+72>:    ld      s4,48(a1)
+   0x0000000080002604 <+76>:    ld      s5,56(a1)
+   0x0000000080002608 <+80>:    ld      s6,64(a1)
+   0x000000008000260c <+84>:    ld      s7,72(a1)
+   0x0000000080002610 <+88>:    ld      s8,80(a1)
+   0x0000000080002614 <+92>:    ld      s9,88(a1)
+   0x0000000080002618 <+96>:    ld      s10,96(a1)
+   0x000000008000261c <+100>:   ld      s11,104(a1)
+   0x0000000080002620 <+104>:   ret
+End of assembler dump.
+  //上面先保存当前进程（的内核线程）的上下文，然后恢复下一内核线程的上下文，
+    //最后执行ret指令开始新内核线程的运行，跟踪到该ret指令：
+
+(gdb) b *0x80002620
+Breakpoint 7 at 0x80002620
+
+(gdb) c
+Continuing.
+
+Breakpoint 7, 0x0000000080002620 in swtch ()
+=> 0x0000000080002620 <swtch+104>:      82 80   ret
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80011250
+3: cpus[$mhartid].proc.pid = 5
+4: cpus[$mhartid].proc.name = "loop", '\000' <repeats 11 times>
+
+//单步执行ret指令
+(gdb) si
+scheduler () at kernel/proc.c:467
+467             c->proc = 0;
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80011250
+3: cpus[$mhartid].proc.pid = 5
+4: cpus[$mhartid].proc.name = "loop", '\000' <repeats 11 times>
+  //已切换到内核调度线程，查看其代码：
+
+(gdb) list
+462             c->proc = p;
+463             swtch(&c->context, &p->context);
+464
+465             // Process is done running for now.
+466             // It should have changed its p->state before coming back.
+467             c->proc = 0;
+468           }
+469           release(&p->lock);
+470         }
+471       }
+  //内核调度线程会继续循环，寻找下一个就绪进程，再切换过去（在第463行）
+
+(gdb) b 462
+Breakpoint 8 at 0x80001f2a: file kernel/proc.c, line 462.
+
+(gdb) c
+Continuing.
+
+Breakpoint 8, scheduler () at kernel/proc.c:462
+462             c->proc = p;
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x0
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x30>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x158>
+
+(gdb) p p->pid
+$1 = 4
+  //可见选中了4号进程
+
+(gdb) c
+Continuing.
+
+Breakpoint 6, 0x00000000800025b8 in swtch ()
+=> 0x00000000800025b8 <swtch+0>:        23 30 15 00    sd       ra,0(a0)
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x800113b8
+3: cpus[$mhartid].proc.pid = 4
+4: cpus[$mhartid].proc.name = "loop", '\000' <repeats 11 times>
+  //此时cpus[$mhartid].proc已更新
+
+(gdb) p/x $satp
+$2 = 0x8000000000087fff
+  //依然为内核页表，没变
+
+(gdb) c
+Continuing.
+
+Breakpoint 7, 0x0000000080002620 in swtch ()
+=> 0x0000000080002620 <swtch+104>:      82 80   ret
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x800113b8
+3: cpus[$mhartid].proc.pid = 4
+4: cpus[$mhartid].proc.name = "loop", '\000' <repeats 11 times>
+
+(gdb) si
+r_tp () at kernel/riscv.h:304
+304       asm volatile("mv %0, tp" : "=r" (x) );
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x800113b8
+3: cpus[$mhartid].proc.pid = 4
+4: cpus[$mhartid].proc.name = "loop", '\000' <repeats 11 times>
+  //4号进程恢复运行，查看其当前状态：
+
+(gdb) bt
+#0  r_tp () at kernel/riscv.h:304
+#1  cpuid () at kernel/proc.c:67
+#2  mycpu () at kernel/proc.c:76
+#3  sched () at kernel/proc.c:498
+#4  0x0000000080002040 in yield () at kernel/proc.c:508
+#5  0x00000000800028ee in usertrap ()
+    at kernel/trap.c:81
+#6  0x000000000000003c in _main () at user/ulib.c:13
+Backtrace stopped: previous frame inner to this frame (corrupt stack?)
+  //可见4号进程在陷阱处理程序中，跟5号进程类似，
+    //4号进程之前也是在时钟中断处理（trap.c:81）时引发了调度，现在恢复运行后返回。
+
+(gdb) next
+sched () at kernel/proc.c:78
+78        return c;
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x800113b8
+3: cpus[$mhartid].proc.pid = 4
+4: cpus[$mhartid].proc.name = "loop", '\000' <repeats 11 times>
+
+(gdb) bt
+#0  sched () at kernel/proc.c:78
+#1  0x0000000080002040 in yield () at kernel/proc.c:508
+#2  0x00000000800028ee in usertrap ()
+    at kernel/trap.c:81
+#3  0x000000000000003c in _main () at user/ulib.c:13
+Backtrace stopped: previous frame inner to this frame (corrupt stack?)
+
+(gdb) list sched
+478     // be proc->intena and proc->noff, but that would
+479     // break in the few places where a lock is held but
+480     // there's no process.
+481     void
+482     sched(void)
+483     {
+484       int intena;
+485       struct proc *p = myproc();
+486
+487       if(!holding(&p->lock))
+(gdb)
+488         panic("sched p->lock");
+489       if(mycpu()->noff != 1)
+490         panic("sched locks");
+491       if(p->state == RUNNING)
+492         panic("sched running");
+493       if(intr_get())
+494         panic("sched interruptible");
+495
+496       intena = mycpu()->intena;
+497       swtch(&p->context, &mycpu()->context);
+(gdb)
+498       mycpu()->intena = intena;
+499     }
+500
+  //4号进程在执行上面的第498行，
+
+(gdb) p/x $satp
+$3 = 0x8000000000087fff
+  //依然在使用内核页表，尽管现在已经切换到了4号进程的内核线程
+
+//跟踪到陷阱返回
+gdb) b *0x3ffffff11c
+Breakpoint 9 at 0x3ffffff11c
+
+(gdb) c
+Continuing.
+
+Breakpoint 9, 0x0000003ffffff11c in ?? ()
+=> 0x0000003ffffff11c:  73 00 20 10     sret
+1: $priv = 1
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010b80>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010b80>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010b80>
+
+(gdb) p/x $satp
+$5 = 0x8000000000087f73
+  //此时页表已经切换为4号进程的，从而维护4号进程的地址空间，处理loop的代码和数据
+
+//查看恢复点，并跟踪过去
+(gdb) p/x $sepc
+$6 = 0x10
+
+(gdb) b *0x10
+Breakpoint 10 at 0x10: file user/tests/loop.c, line 10.
+
+(gdb) si
+
+Breakpoint 10, main (argc=1, argv=0x3fe0) at user/tests/loop.c:10
+10          counter++;
+1: $priv = 0
+2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010b80>
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x80010b80>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x80010b80>
+
+(gdb) disassemble
+Dump of assembler code for function main:
+   0x0000000000000000 <+0>:     addi    sp,sp,-32
+   0x0000000000000002 <+2>:     sd      s0,24(sp)
+   0x0000000000000004 <+4>:     addi    s0,sp,32
+   0x0000000000000006 <+6>:     mv      a5,a0
+   0x0000000000000008 <+8>:     sd      a1,-32(s0)
+   0x000000000000000c <+12>:    sw      a5,-20(s0)
+=> 0x0000000000000010 <+16>:    auipc   a5,0x1
+   0x0000000000000014 <+20>:    addi    a5,a5,-16 # 0x1000 <counter>
+   0x0000000000000018 <+24>:    lw      a5,0(a5)
+   0x000000000000001a <+26>:    addiw   a5,a5,1
+   0x000000000000001c <+28>:    sext.w  a4,a5
+   0x0000000000000020 <+32>:    auipc   a5,0x1
+   0x0000000000000024 <+36>:    addi    a5,a5,-32 # 0x1000 <counter>
+   0x0000000000000028 <+40>:    sw      a4,0(a5)
+   0x000000000000002a <+42>:    j       0x10 <main+16>
+End of assembler dump.
+  //可见4号进程的恢复点也在循环内
+
+//现在可以退出
+(gdb) kill
+[Inferior 1 (process 1) killed]
+
+(gdb) quit
+ubuntu@ubuntu-2204:~/os/lab/0$ 
+
+
+//小结：5号进程的用户线程在执行时发生了时钟中断，在中断处理中引发了进程调度，从而切换到内核调度线程，选择了处于就绪态的4号进程，并切换到了4号进程的内核线程，后者当前也处于时钟中断引发的陷阱处理程序中，sret返回后回到4号进程的用户线程。整个过程中，共有三个地址空间，分别是5号进程（用户线程）的地址空间、内核地址空间、4号进程（用户线程）的地址空间。

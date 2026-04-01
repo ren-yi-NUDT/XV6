@@ -1,0 +1,63 @@
+//目的：分析xv6的第一次进程调度。
+
+//以调试模式启动qemu虚拟机
+demo@ali4nudtOS:/home/os/lab$ make qemu-gdb
+cp fs.img ~/
+*** Now run 'gdb' in another window.
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 1  -nographic -global virtio-mmio.force-legacy=false -drive file=/home/demo/fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -S -gdb tcp::26129
+
+
+//现在*切换到另一个Windows命令行窗口*，然后再次登录云服务
+F:\tmp>ssh demo@47.122.113.125
+...
+
+//启动gdb
+demo@ali4nudtOS:/home/os/lab$ ./mygdb
+GNU gdb (Ubuntu 12.1-0ubuntu1~22.04.2) 12.1
+Copyright (C) 2022 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Type "show copying" and "show warranty" for details.
+This GDB was configured as "x86_64-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<https://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+    <http://www.gnu.org/software/gdb/documentation/>.
+
+For help, type "help".
+Type "apropos word" to search for commands related to "word".
+GDBTARGET = localhost:26129
+0x0000000000001000 in ?? ()
+The target architecture is set to "riscv:rv64".
+Breakpoint 1 at 0x8000008c: file kernel/start.c, line 22.
+Breakpoint 2 at 0x80002508: file kernel/proc.c, line 660.
+
+//跟踪到第一次进程调度
+(gdb) b sched
+Breakpoint 3 at 0x80001f42: file kernel/proc.c, line 483.
+
+(gdb) c
+Continuing.
+
+Breakpoint 1, start () at kernel/start.c:22
+22      {
+1: $priv = 3
+2: /x cpus[$mhartid].proc = 0x0
+3: cpus[$mhartid].proc.pid = <error: Cannot access memory at address 0x30>
+4: cpus[$mhartid].proc.name = <error: Cannot access memory at address 0x158>
+
+(gdb) c
+Continuing.
+
+Breakpoint 3, sched () at kernel/proc.c:483
+483     {
+1: $priv = 1
+2: /x cpus[$mhartid].proc = 0x80010f80
+3: cpus[$mhartid].proc.pid = 1
+4: cpus[$mhartid].proc.name = "initcode\000\000\000\000\000\000\000"
+
+//请问：此次调度发生时是几号进程在运行？sched函数是被哪个函数直接调用的？这次调度选出的下一进程是几号进程？下一进程恢复运行（执行swtch的ret）后是在执行哪个函数？当时函数调用栈的栈底是哪个函数？（不算myproc）
+
+

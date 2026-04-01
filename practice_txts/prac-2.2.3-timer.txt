@@ -94,19 +94,19 @@ Breakpoint 3, exec (path=path@entry=0x3fffff9f00 "loop", argv=argv@entry=0x3ffff
   //可见即将执行loop程序
 
 //现在加载loop的符号文件
-(gdb) add-symbol-file user/_loop 0
-add symbol table from file "user/_loop" at
+(gdb) add-symbol-file user/tests/_loop 0
+add symbol table from file "user/tests/_loop" at
         .text_addr = 0x0
-Reading symbols from user/_loop...
+Reading symbols from user/tests/_loop...
 
 //然后在loop程序的开始点设断点，并跟踪过去
 (gdb) b *0x0
-Breakpoint 4 at 0x0: file user/loop.c, line 8.
+Breakpoint 4 at 0x0: file user/tests/loop.c, line 8.
 
 (gdb) c
 Continuing.
 
-Breakpoint 4, main (argc=0, argv=0x0 <main>) at user/loop.c:8
+Breakpoint 4, main (argc=0, argv=0x0 <main>) at user/tests/loop.c:8
 8       {
 1: $priv = 0
 2: /x cpus[$mhartid].proc = <error: Cannot access memory at address 0x80010b80>
@@ -130,7 +130,7 @@ Dump of assembler code for function main:
    0x0000000000000020 <+32>:    auipc   a5,0x1
    0x0000000000000024 <+36>:    addi    a5,a5,-32 # 0x1000 <counter>
    0x0000000000000028 <+40>:    sw      a4,0(a5)
-   0x000000000000002a <+42>:    j       0x10 <main+16>
+   0x000000000000002a c<+42>:    j       0x10 <main+16>
 End of assembler dump.
   //可见即将进入0x10~0x2a处的死循环
 
