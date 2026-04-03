@@ -2,11 +2,9 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
-#define SLEEPTIME 20
-
 int main(int argc, char *argv[]){
     if (argc != 2){
-        sleep(SLEEPTIME);
+        sleep(5);
     }
     else {
         int tick = atoi(argv[1]) * 10;

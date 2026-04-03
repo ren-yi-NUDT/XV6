@@ -2,9 +2,10 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
+
 void primes(int p[2]){
     int base;
-    if (read(p[0], &base, sizeof(int)) <= 0){
+    if(read(p[0], &base, sizeof(int)) <= 0){
         close(p[0]);
         exit(0);
     }
@@ -12,6 +13,7 @@ void primes(int p[2]){
 
     int next[2];
     pipe(next);
+
     int n;
     while (read(p[0], &n, sizeof(int)) > 0){
         if (n % base != 0){
@@ -39,17 +41,20 @@ void primes(int p[2]){
 int main(int argc, char *argv[]){
     int p[2];
     pipe(p);
-    
+
     if (argc != 2){
         for (int i = 2; i <= 35; i++){
             write(p[1], &i, sizeof(int));
         }
     }
     else{
-        for (int i = 2; i <= (atoi(argv[1]) > 129 ? 129 : atoi(argv[1])); i++){
+        int upperLimit = atoi(argv[1]);
+        for (int i = 2; i <= upperLimit; i++){
             write(p[1], &i, sizeof(int));
         }
     }
+
+    
     close(p[1]);
 
     int pid = fork();
@@ -65,5 +70,4 @@ int main(int argc, char *argv[]){
         wait(0);
     }
     exit(0);
-    
 }
