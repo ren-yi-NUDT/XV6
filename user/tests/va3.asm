@@ -5,20 +5,12 @@ user/tests/_va3:     file format elf64-littleriscv
 Disassembly of section .text:
 
 0000000000000000 <main>:
-#include "kernel/stat.h"
-#include "user/user.h"
-
-int
-main (int argc, char *argv[])
-{
    0:	1101                	addi	sp,sp,-32
    2:	ec06                	sd	ra,24(sp)
    4:	e822                	sd	s0,16(sp)
    6:	e426                	sd	s1,8(sp)
    8:	e04a                	sd	s2,0(sp)
    a:	1000                	addi	s0,sp,32
-  void *p1, *p2, *p3; 
-  printf ("location of malloc(0x1000) : %p\n", (p1 = malloc (0x1000)));
    c:	6505                	lui	a0,0x1
    e:	00001097          	auipc	ra,0x1
   12:	87a080e7          	jalr	-1926(ra) # 888 <malloc>
@@ -28,7 +20,6 @@ main (int argc, char *argv[])
   1e:	9b650513          	addi	a0,a0,-1610 # 9d0 <malloc+0x148>
   22:	00000097          	auipc	ra,0x0
   26:	678080e7          	jalr	1656(ra) # 69a <printf>
-  printf ("location of malloc(0x10000) : %p\n", (p2 = malloc (0x10000)));
   2a:	6541                	lui	a0,0x10
   2c:	00001097          	auipc	ra,0x1
   30:	85c080e7          	jalr	-1956(ra) # 888 <malloc>
@@ -38,11 +29,9 @@ main (int argc, char *argv[])
   3c:	9c050513          	addi	a0,a0,-1600 # 9f8 <malloc+0x170>
   40:	00000097          	auipc	ra,0x0
   44:	65a080e7          	jalr	1626(ra) # 69a <printf>
-  free(p2);
   48:	8526                	mv	a0,s1
   4a:	00000097          	auipc	ra,0x0
   4e:	69c080e7          	jalr	1692(ra) # 6e6 <free>
-  printf ("location of malloc(0x100) : %p\n", (p3 = malloc (0x100)));
   52:	10000513          	li	a0,256
   56:	00001097          	auipc	ra,0x1
   5a:	832080e7          	jalr	-1998(ra) # 888 <malloc>
@@ -52,16 +41,12 @@ main (int argc, char *argv[])
   66:	9be50513          	addi	a0,a0,-1602 # a20 <malloc+0x198>
   6a:	00000097          	auipc	ra,0x0
   6e:	630080e7          	jalr	1584(ra) # 69a <printf>
-  free(p1);
   72:	854a                	mv	a0,s2
   74:	00000097          	auipc	ra,0x0
   78:	672080e7          	jalr	1650(ra) # 6e6 <free>
-  free(p3);
   7c:	8526                	mv	a0,s1
   7e:	00000097          	auipc	ra,0x0
   82:	668080e7          	jalr	1640(ra) # 6e6 <free>
-  return 0;
-}
   86:	4501                	li	a0,0
   88:	60e2                	ld	ra,24(sp)
   8a:	6442                	ld	s0,16(sp)

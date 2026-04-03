@@ -5,52 +5,37 @@ user/tests/_va2:     file format elf64-littleriscv
 Disassembly of section .text:
 
 0000000000000000 <main>:
-#include "kernel/stat.h"
-#include "user/user.h"
-
-int
-main (int argc, char *argv[])
-{
    0:	1101                	addi	sp,sp,-32
    2:	ec06                	sd	ra,24(sp)
    4:	e822                	sd	s0,16(sp)
    6:	1000                	addi	s0,sp,32
-  char *src = "hello";	//字符串常量（在数据段分配空间） 
    8:	00001797          	auipc	a5,0x1
    c:	9a878793          	addi	a5,a5,-1624 # 9b0 <malloc+0x13e>
   10:	fef43423          	sd	a5,-24(s0)
-  char *dst;
-  printf ("location of src  : %p\n", (void *) &src);
   14:	fe840593          	addi	a1,s0,-24
   18:	00001517          	auipc	a0,0x1
   1c:	9a050513          	addi	a0,a0,-1632 # 9b8 <malloc+0x146>
   20:	00000097          	auipc	ra,0x0
   24:	664080e7          	jalr	1636(ra) # 684 <printf>
-  printf ("location of dst  : %p\n", (void *) &dst);
   28:	fe040593          	addi	a1,s0,-32
   2c:	00001517          	auipc	a0,0x1
   30:	9a450513          	addi	a0,a0,-1628 # 9d0 <malloc+0x15e>
   34:	00000097          	auipc	ra,0x0
   38:	650080e7          	jalr	1616(ra) # 684 <printf>
-  printf ("location of *src : %p\n", (void *) src);
   3c:	fe843583          	ld	a1,-24(s0)
   40:	00001517          	auipc	a0,0x1
   44:	9a850513          	addi	a0,a0,-1624 # 9e8 <malloc+0x176>
   48:	00000097          	auipc	ra,0x0
   4c:	63c080e7          	jalr	1596(ra) # 684 <printf>
-  printf ("location of *dst : %p\n", (void *) dst);
   50:	fe043583          	ld	a1,-32(s0)
   54:	00001517          	auipc	a0,0x1
   58:	9ac50513          	addi	a0,a0,-1620 # a00 <malloc+0x18e>
   5c:	00000097          	auipc	ra,0x0
   60:	628080e7          	jalr	1576(ra) # 684 <printf>
-  strcpy (dst, src);
   64:	fe843583          	ld	a1,-24(s0)
   68:	fe043503          	ld	a0,-32(s0)
   6c:	00000097          	auipc	ra,0x0
   70:	02c080e7          	jalr	44(ra) # 98 <strcpy>
-  return 0;
-}
   74:	4501                	li	a0,0
   76:	60e2                	ld	ra,24(sp)
   78:	6442                	ld	s0,16(sp)

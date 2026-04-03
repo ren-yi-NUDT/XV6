@@ -1775,209 +1775,121 @@ pop_off(void)
     80000d48:	81c080e7          	jalr	-2020(ra) # 80000560 <panic>
 
 0000000080000d4c <memset>:
-#include "types.h"
-
-void*
-memset(void *dst, int c, uint n)
-{
     80000d4c:	1141                	addi	sp,sp,-16
     80000d4e:	e422                	sd	s0,8(sp)
     80000d50:	0800                	addi	s0,sp,16
-  char *cdst = (char *) dst;
-  int i;
-  for(i = 0; i < n; i++){
     80000d52:	ca19                	beqz	a2,80000d68 <memset+0x1c>
     80000d54:	87aa                	mv	a5,a0
     80000d56:	1602                	slli	a2,a2,0x20
     80000d58:	9201                	srli	a2,a2,0x20
     80000d5a:	00a60733          	add	a4,a2,a0
-    cdst[i] = c;
     80000d5e:	00b78023          	sb	a1,0(a5)
-  for(i = 0; i < n; i++){
     80000d62:	0785                	addi	a5,a5,1
     80000d64:	fee79de3          	bne	a5,a4,80000d5e <memset+0x12>
-  }
-  return dst;
-}
     80000d68:	6422                	ld	s0,8(sp)
     80000d6a:	0141                	addi	sp,sp,16
     80000d6c:	8082                	ret
 
 0000000080000d6e <memcmp>:
-
-int
-memcmp(const void *v1, const void *v2, uint n)
-{
     80000d6e:	1141                	addi	sp,sp,-16
     80000d70:	e422                	sd	s0,8(sp)
     80000d72:	0800                	addi	s0,sp,16
-  const uchar *s1, *s2;
-
-  s1 = v1;
-  s2 = v2;
-  while(n-- > 0){
     80000d74:	ca05                	beqz	a2,80000da4 <memcmp+0x36>
     80000d76:	fff6069b          	addiw	a3,a2,-1 # fff <_entry-0x7ffff001>
     80000d7a:	1682                	slli	a3,a3,0x20
     80000d7c:	9281                	srli	a3,a3,0x20
     80000d7e:	0685                	addi	a3,a3,1
     80000d80:	96aa                	add	a3,a3,a0
-    if(*s1 != *s2)
     80000d82:	00054783          	lbu	a5,0(a0)
     80000d86:	0005c703          	lbu	a4,0(a1)
     80000d8a:	00e79863          	bne	a5,a4,80000d9a <memcmp+0x2c>
-      return *s1 - *s2;
-    s1++, s2++;
     80000d8e:	0505                	addi	a0,a0,1
     80000d90:	0585                	addi	a1,a1,1
-  while(n-- > 0){
     80000d92:	fed518e3          	bne	a0,a3,80000d82 <memcmp+0x14>
-  }
-
-  return 0;
     80000d96:	4501                	li	a0,0
     80000d98:	a019                	j	80000d9e <memcmp+0x30>
-      return *s1 - *s2;
     80000d9a:	40e7853b          	subw	a0,a5,a4
-}
     80000d9e:	6422                	ld	s0,8(sp)
     80000da0:	0141                	addi	sp,sp,16
     80000da2:	8082                	ret
-  return 0;
     80000da4:	4501                	li	a0,0
     80000da6:	bfe5                	j	80000d9e <memcmp+0x30>
 
 0000000080000da8 <memmove>:
-
-void*
-memmove(void *dst, const void *src, uint n)
-{
     80000da8:	1141                	addi	sp,sp,-16
     80000daa:	e422                	sd	s0,8(sp)
     80000dac:	0800                	addi	s0,sp,16
-  const char *s;
-  char *d;
-
-  if(n == 0)
     80000dae:	c205                	beqz	a2,80000dce <memmove+0x26>
-    return dst;
-  
-  s = src;
-  d = dst;
-  if(s < d && s + n > d){
     80000db0:	02a5e263          	bltu	a1,a0,80000dd4 <memmove+0x2c>
-    s += n;
-    d += n;
-    while(n-- > 0)
-      *--d = *--s;
-  } else
-    while(n-- > 0)
     80000db4:	1602                	slli	a2,a2,0x20
     80000db6:	9201                	srli	a2,a2,0x20
     80000db8:	00c587b3          	add	a5,a1,a2
-{
     80000dbc:	872a                	mv	a4,a0
-      *d++ = *s++;
     80000dbe:	0585                	addi	a1,a1,1
     80000dc0:	0705                	addi	a4,a4,1 # fffffffffffff001 <end+0xffffffff7ffda921>
     80000dc2:	fff5c683          	lbu	a3,-1(a1)
     80000dc6:	fed70fa3          	sb	a3,-1(a4)
-    while(n-- > 0)
     80000dca:	feb79ae3          	bne	a5,a1,80000dbe <memmove+0x16>
-
-  return dst;
-}
     80000dce:	6422                	ld	s0,8(sp)
     80000dd0:	0141                	addi	sp,sp,16
     80000dd2:	8082                	ret
-  if(s < d && s + n > d){
     80000dd4:	02061693          	slli	a3,a2,0x20
     80000dd8:	9281                	srli	a3,a3,0x20
     80000dda:	00d58733          	add	a4,a1,a3
     80000dde:	fce57be3          	bgeu	a0,a4,80000db4 <memmove+0xc>
-    d += n;
     80000de2:	96aa                	add	a3,a3,a0
-    while(n-- > 0)
     80000de4:	fff6079b          	addiw	a5,a2,-1
     80000de8:	1782                	slli	a5,a5,0x20
     80000dea:	9381                	srli	a5,a5,0x20
     80000dec:	fff7c793          	not	a5,a5
     80000df0:	97ba                	add	a5,a5,a4
-      *--d = *--s;
     80000df2:	177d                	addi	a4,a4,-1
     80000df4:	16fd                	addi	a3,a3,-1
     80000df6:	00074603          	lbu	a2,0(a4)
     80000dfa:	00c68023          	sb	a2,0(a3)
-    while(n-- > 0)
     80000dfe:	fef71ae3          	bne	a4,a5,80000df2 <memmove+0x4a>
     80000e02:	b7f1                	j	80000dce <memmove+0x26>
 
 0000000080000e04 <memcpy>:
-
-// memcpy exists to placate GCC.  Use memmove.
-void*
-memcpy(void *dst, const void *src, uint n)
-{
     80000e04:	1141                	addi	sp,sp,-16
     80000e06:	e406                	sd	ra,8(sp)
     80000e08:	e022                	sd	s0,0(sp)
     80000e0a:	0800                	addi	s0,sp,16
-  return memmove(dst, src, n);
     80000e0c:	00000097          	auipc	ra,0x0
     80000e10:	f9c080e7          	jalr	-100(ra) # 80000da8 <memmove>
-}
     80000e14:	60a2                	ld	ra,8(sp)
     80000e16:	6402                	ld	s0,0(sp)
     80000e18:	0141                	addi	sp,sp,16
     80000e1a:	8082                	ret
 
 0000000080000e1c <strncmp>:
-
-int
-strncmp(const char *p, const char *q, uint n)
-{
     80000e1c:	1141                	addi	sp,sp,-16
     80000e1e:	e422                	sd	s0,8(sp)
     80000e20:	0800                	addi	s0,sp,16
-  while(n > 0 && *p && *p == *q)
     80000e22:	ce11                	beqz	a2,80000e3e <strncmp+0x22>
     80000e24:	00054783          	lbu	a5,0(a0)
     80000e28:	cf89                	beqz	a5,80000e42 <strncmp+0x26>
     80000e2a:	0005c703          	lbu	a4,0(a1)
     80000e2e:	00f71a63          	bne	a4,a5,80000e42 <strncmp+0x26>
-    n--, p++, q++;
     80000e32:	367d                	addiw	a2,a2,-1
     80000e34:	0505                	addi	a0,a0,1
     80000e36:	0585                	addi	a1,a1,1
-  while(n > 0 && *p && *p == *q)
     80000e38:	f675                	bnez	a2,80000e24 <strncmp+0x8>
-  if(n == 0)
-    return 0;
     80000e3a:	4501                	li	a0,0
     80000e3c:	a801                	j	80000e4c <strncmp+0x30>
     80000e3e:	4501                	li	a0,0
     80000e40:	a031                	j	80000e4c <strncmp+0x30>
-  return (uchar)*p - (uchar)*q;
     80000e42:	00054503          	lbu	a0,0(a0)
     80000e46:	0005c783          	lbu	a5,0(a1)
     80000e4a:	9d1d                	subw	a0,a0,a5
-}
     80000e4c:	6422                	ld	s0,8(sp)
     80000e4e:	0141                	addi	sp,sp,16
     80000e50:	8082                	ret
 
 0000000080000e52 <strncpy>:
-
-char*
-strncpy(char *s, const char *t, int n)
-{
     80000e52:	1141                	addi	sp,sp,-16
     80000e54:	e422                	sd	s0,8(sp)
     80000e56:	0800                	addi	s0,sp,16
-  char *os;
-
-  os = s;
-  while(n-- > 0 && (*s++ = *t++) != 0)
     80000e58:	87aa                	mv	a5,a0
     80000e5a:	86b2                	mv	a3,a2
     80000e5c:	367d                	addiw	a2,a2,-1
@@ -1987,71 +1899,43 @@ strncpy(char *s, const char *t, int n)
     80000e68:	fee78fa3          	sb	a4,-1(a5)
     80000e6c:	0585                	addi	a1,a1,1
     80000e6e:	f775                	bnez	a4,80000e5a <strncpy+0x8>
-    ;
-  while(n-- > 0)
     80000e70:	873e                	mv	a4,a5
     80000e72:	9fb5                	addw	a5,a5,a3
     80000e74:	37fd                	addiw	a5,a5,-1
     80000e76:	00c05963          	blez	a2,80000e88 <strncpy+0x36>
-    *s++ = 0;
     80000e7a:	0705                	addi	a4,a4,1
     80000e7c:	fe070fa3          	sb	zero,-1(a4)
-  while(n-- > 0)
     80000e80:	40e786bb          	subw	a3,a5,a4
     80000e84:	fed04be3          	bgtz	a3,80000e7a <strncpy+0x28>
-  return os;
-}
     80000e88:	6422                	ld	s0,8(sp)
     80000e8a:	0141                	addi	sp,sp,16
     80000e8c:	8082                	ret
 
 0000000080000e8e <safestrcpy>:
-
-// Like strncpy but guaranteed to NUL-terminate.
-char*
-safestrcpy(char *s, const char *t, int n)
-{
     80000e8e:	1141                	addi	sp,sp,-16
     80000e90:	e422                	sd	s0,8(sp)
     80000e92:	0800                	addi	s0,sp,16
-  char *os;
-
-  os = s;
-  if(n <= 0)
     80000e94:	02c05363          	blez	a2,80000eba <safestrcpy+0x2c>
     80000e98:	fff6069b          	addiw	a3,a2,-1
     80000e9c:	1682                	slli	a3,a3,0x20
     80000e9e:	9281                	srli	a3,a3,0x20
     80000ea0:	96ae                	add	a3,a3,a1
     80000ea2:	87aa                	mv	a5,a0
-    return os;
-  while(--n > 0 && (*s++ = *t++) != 0)
     80000ea4:	00d58963          	beq	a1,a3,80000eb6 <safestrcpy+0x28>
     80000ea8:	0585                	addi	a1,a1,1
     80000eaa:	0785                	addi	a5,a5,1
     80000eac:	fff5c703          	lbu	a4,-1(a1)
     80000eb0:	fee78fa3          	sb	a4,-1(a5)
     80000eb4:	fb65                	bnez	a4,80000ea4 <safestrcpy+0x16>
-    ;
-  *s = 0;
     80000eb6:	00078023          	sb	zero,0(a5)
-  return os;
-}
     80000eba:	6422                	ld	s0,8(sp)
     80000ebc:	0141                	addi	sp,sp,16
     80000ebe:	8082                	ret
 
 0000000080000ec0 <strlen>:
-
-int
-strlen(const char *s)
-{
     80000ec0:	1141                	addi	sp,sp,-16
     80000ec2:	e422                	sd	s0,8(sp)
     80000ec4:	0800                	addi	s0,sp,16
-  int n;
-
-  for(n = 0; s[n]; n++)
     80000ec6:	00054783          	lbu	a5,0(a0)
     80000eca:	cf91                	beqz	a5,80000ee6 <strlen+0x26>
     80000ecc:	0505                	addi	a0,a0,1
@@ -2062,13 +1946,9 @@ strlen(const char *s)
     80000ed8:	ff65                	bnez	a4,80000ed0 <strlen+0x10>
     80000eda:	40a6853b          	subw	a0,a3,a0
     80000ede:	2505                	addiw	a0,a0,1
-    ;
-  return n;
-}
     80000ee0:	6422                	ld	s0,8(sp)
     80000ee2:	0141                	addi	sp,sp,16
     80000ee4:	8082                	ret
-  for(n = 0; s[n]; n++)
     80000ee6:	4501                	li	a0,0
     80000ee8:	bfe5                	j	80000ee0 <strlen+0x20>
 
@@ -9297,80 +9177,51 @@ holdingsleep(struct sleeplock *lk)
     8000453c:	b7f9                	j	8000450a <holdingsleep+0x22>
 
 000000008000453e <fileinit>:
-  struct file file[NFILE];
-} ftable;
-
-void
-fileinit(void)
-{
     8000453e:	1141                	addi	sp,sp,-16
     80004540:	e406                	sd	ra,8(sp)
     80004542:	e022                	sd	s0,0(sp)
     80004544:	0800                	addi	s0,sp,16
-  initlock(&ftable.lock, "ftable");
     80004546:	00004597          	auipc	a1,0x4
     8000454a:	03a58593          	addi	a1,a1,58 # 80008580 <etext+0x580>
     8000454e:	0001f517          	auipc	a0,0x1f
     80004552:	09a50513          	addi	a0,a0,154 # 800235e8 <ftable>
     80004556:	ffffc097          	auipc	ra,0xffffc
     8000455a:	66a080e7          	jalr	1642(ra) # 80000bc0 <initlock>
-}
     8000455e:	60a2                	ld	ra,8(sp)
     80004560:	6402                	ld	s0,0(sp)
     80004562:	0141                	addi	sp,sp,16
     80004564:	8082                	ret
 
 0000000080004566 <filealloc>:
-
-// Allocate a file structure.
-struct file*
-filealloc(void)
-{
     80004566:	1101                	addi	sp,sp,-32
     80004568:	ec06                	sd	ra,24(sp)
     8000456a:	e822                	sd	s0,16(sp)
     8000456c:	e426                	sd	s1,8(sp)
     8000456e:	1000                	addi	s0,sp,32
-  struct file *f;
-
-  acquire(&ftable.lock);
     80004570:	0001f517          	auipc	a0,0x1f
     80004574:	07850513          	addi	a0,a0,120 # 800235e8 <ftable>
     80004578:	ffffc097          	auipc	ra,0xffffc
     8000457c:	6d8080e7          	jalr	1752(ra) # 80000c50 <acquire>
-  for(f = ftable.file; f < ftable.file + NFILE; f++){
     80004580:	0001f497          	auipc	s1,0x1f
     80004584:	08048493          	addi	s1,s1,128 # 80023600 <ftable+0x18>
     80004588:	00020717          	auipc	a4,0x20
     8000458c:	01870713          	addi	a4,a4,24 # 800245a0 <disk>
-    if(f->ref == 0){
     80004590:	40dc                	lw	a5,4(s1)
     80004592:	cf99                	beqz	a5,800045b0 <filealloc+0x4a>
-  for(f = ftable.file; f < ftable.file + NFILE; f++){
     80004594:	02848493          	addi	s1,s1,40
     80004598:	fee49ce3          	bne	s1,a4,80004590 <filealloc+0x2a>
-      f->ref = 1;
-      release(&ftable.lock);
-      return f;
-    }
-  }
-  release(&ftable.lock);
     8000459c:	0001f517          	auipc	a0,0x1f
     800045a0:	04c50513          	addi	a0,a0,76 # 800235e8 <ftable>
     800045a4:	ffffc097          	auipc	ra,0xffffc
     800045a8:	760080e7          	jalr	1888(ra) # 80000d04 <release>
-  return 0;
     800045ac:	4481                	li	s1,0
     800045ae:	a819                	j	800045c4 <filealloc+0x5e>
-      f->ref = 1;
     800045b0:	4785                	li	a5,1
     800045b2:	c0dc                	sw	a5,4(s1)
-      release(&ftable.lock);
     800045b4:	0001f517          	auipc	a0,0x1f
     800045b8:	03450513          	addi	a0,a0,52 # 800235e8 <ftable>
     800045bc:	ffffc097          	auipc	ra,0xffffc
     800045c0:	748080e7          	jalr	1864(ra) # 80000d04 <release>
-}
     800045c4:	8526                	mv	a0,s1
     800045c6:	60e2                	ld	ra,24(sp)
     800045c8:	6442                	ld	s0,16(sp)
@@ -9379,72 +9230,48 @@ filealloc(void)
     800045ce:	8082                	ret
 
 00000000800045d0 <filedup>:
-
-// Increment ref count for file f.
-struct file*
-filedup(struct file *f)
-{
     800045d0:	1101                	addi	sp,sp,-32
     800045d2:	ec06                	sd	ra,24(sp)
     800045d4:	e822                	sd	s0,16(sp)
     800045d6:	e426                	sd	s1,8(sp)
     800045d8:	1000                	addi	s0,sp,32
     800045da:	84aa                	mv	s1,a0
-  acquire(&ftable.lock);
     800045dc:	0001f517          	auipc	a0,0x1f
     800045e0:	00c50513          	addi	a0,a0,12 # 800235e8 <ftable>
     800045e4:	ffffc097          	auipc	ra,0xffffc
     800045e8:	66c080e7          	jalr	1644(ra) # 80000c50 <acquire>
-  if(f->ref < 1)
     800045ec:	40dc                	lw	a5,4(s1)
     800045ee:	02f05263          	blez	a5,80004612 <filedup+0x42>
-    panic("filedup");
-  f->ref++;
     800045f2:	2785                	addiw	a5,a5,1
     800045f4:	c0dc                	sw	a5,4(s1)
-  release(&ftable.lock);
     800045f6:	0001f517          	auipc	a0,0x1f
     800045fa:	ff250513          	addi	a0,a0,-14 # 800235e8 <ftable>
     800045fe:	ffffc097          	auipc	ra,0xffffc
     80004602:	706080e7          	jalr	1798(ra) # 80000d04 <release>
-  return f;
-}
     80004606:	8526                	mv	a0,s1
     80004608:	60e2                	ld	ra,24(sp)
     8000460a:	6442                	ld	s0,16(sp)
     8000460c:	64a2                	ld	s1,8(sp)
     8000460e:	6105                	addi	sp,sp,32
     80004610:	8082                	ret
-    panic("filedup");
     80004612:	00004517          	auipc	a0,0x4
     80004616:	f7650513          	addi	a0,a0,-138 # 80008588 <etext+0x588>
     8000461a:	ffffc097          	auipc	ra,0xffffc
     8000461e:	f46080e7          	jalr	-186(ra) # 80000560 <panic>
 
 0000000080004622 <fileclose>:
-
-// Close file f.  (Decrement ref count, close when reaches 0.)
-void
-fileclose(struct file *f)
-{
     80004622:	7139                	addi	sp,sp,-64
     80004624:	fc06                	sd	ra,56(sp)
     80004626:	f822                	sd	s0,48(sp)
     80004628:	f426                	sd	s1,40(sp)
     8000462a:	0080                	addi	s0,sp,64
     8000462c:	84aa                	mv	s1,a0
-  struct file ff;
-
-  acquire(&ftable.lock);
     8000462e:	0001f517          	auipc	a0,0x1f
     80004632:	fba50513          	addi	a0,a0,-70 # 800235e8 <ftable>
     80004636:	ffffc097          	auipc	ra,0xffffc
     8000463a:	61a080e7          	jalr	1562(ra) # 80000c50 <acquire>
-  if(f->ref < 1)
     8000463e:	40dc                	lw	a5,4(s1)
     80004640:	04f05c63          	blez	a5,80004698 <fileclose+0x76>
-    panic("fileclose");
-  if(--f->ref > 0){
     80004644:	37fd                	addiw	a5,a5,-1
     80004646:	0007871b          	sext.w	a4,a5
     8000464a:	c0dc                	sw	a5,4(s1)
@@ -9453,29 +9280,18 @@ fileclose(struct file *f)
     80004652:	ec4e                	sd	s3,24(sp)
     80004654:	e852                	sd	s4,16(sp)
     80004656:	e456                	sd	s5,8(sp)
-    release(&ftable.lock);
-    return;
-  }
-  ff = *f;
     80004658:	0004a903          	lw	s2,0(s1)
     8000465c:	0094ca83          	lbu	s5,9(s1)
     80004660:	0104ba03          	ld	s4,16(s1)
     80004664:	0184b983          	ld	s3,24(s1)
-  f->ref = 0;
     80004668:	0004a223          	sw	zero,4(s1)
-  f->type = FD_NONE;
     8000466c:	0004a023          	sw	zero,0(s1)
-  release(&ftable.lock);
     80004670:	0001f517          	auipc	a0,0x1f
     80004674:	f7850513          	addi	a0,a0,-136 # 800235e8 <ftable>
     80004678:	ffffc097          	auipc	ra,0xffffc
     8000467c:	68c080e7          	jalr	1676(ra) # 80000d04 <release>
-
-  if(ff.type == FD_PIPE){
     80004680:	4785                	li	a5,1
     80004682:	04f90463          	beq	s2,a5,800046ca <fileclose+0xa8>
-    pipeclose(ff.pipe, ff.writable);
-  } else if(ff.type == FD_INODE || ff.type == FD_DEVICE){
     80004686:	3979                	addiw	s2,s2,-2
     80004688:	4785                	li	a5,1
     8000468a:	0527fb63          	bgeu	a5,s2,800046e0 <fileclose+0xbe>
@@ -9488,27 +9304,19 @@ fileclose(struct file *f)
     8000469a:	ec4e                	sd	s3,24(sp)
     8000469c:	e852                	sd	s4,16(sp)
     8000469e:	e456                	sd	s5,8(sp)
-    panic("fileclose");
     800046a0:	00004517          	auipc	a0,0x4
     800046a4:	ef050513          	addi	a0,a0,-272 # 80008590 <etext+0x590>
     800046a8:	ffffc097          	auipc	ra,0xffffc
     800046ac:	eb8080e7          	jalr	-328(ra) # 80000560 <panic>
-    release(&ftable.lock);
     800046b0:	0001f517          	auipc	a0,0x1f
     800046b4:	f3850513          	addi	a0,a0,-200 # 800235e8 <ftable>
     800046b8:	ffffc097          	auipc	ra,0xffffc
     800046bc:	64c080e7          	jalr	1612(ra) # 80000d04 <release>
-    begin_op();
-    iput(ff.ip);
-    end_op();
-  }
-}
     800046c0:	70e2                	ld	ra,56(sp)
     800046c2:	7442                	ld	s0,48(sp)
     800046c4:	74a2                	ld	s1,40(sp)
     800046c6:	6121                	addi	sp,sp,64
     800046c8:	8082                	ret
-    pipeclose(ff.pipe, ff.writable);
     800046ca:	85d6                	mv	a1,s5
     800046cc:	8552                	mv	a0,s4
     800046ce:	00000097          	auipc	ra,0x0
@@ -9518,14 +9326,11 @@ fileclose(struct file *f)
     800046da:	6a42                	ld	s4,16(sp)
     800046dc:	6aa2                	ld	s5,8(sp)
     800046de:	b7cd                	j	800046c0 <fileclose+0x9e>
-    begin_op();
     800046e0:	00000097          	auipc	ra,0x0
     800046e4:	a78080e7          	jalr	-1416(ra) # 80004158 <begin_op>
-    iput(ff.ip);
     800046e8:	854e                	mv	a0,s3
     800046ea:	fffff097          	auipc	ra,0xfffff
     800046ee:	25e080e7          	jalr	606(ra) # 80003948 <iput>
-    end_op();
     800046f2:	00000097          	auipc	ra,0x0
     800046f6:	ae0080e7          	jalr	-1312(ra) # 800041d2 <end_op>
     800046fa:	7902                	ld	s2,32(sp)
@@ -9535,12 +9340,6 @@ fileclose(struct file *f)
     80004702:	bf7d                	j	800046c0 <fileclose+0x9e>
 
 0000000080004704 <filestat>:
-
-// Get metadata about file f.
-// addr is a user virtual address, pointing to a struct stat.
-int
-filestat(struct file *f, uint64 addr)
-{
     80004704:	715d                	addi	sp,sp,-80
     80004706:	e486                	sd	ra,72(sp)
     80004708:	e0a2                	sd	s0,64(sp)
@@ -9549,32 +9348,24 @@ filestat(struct file *f, uint64 addr)
     8000470e:	0880                	addi	s0,sp,80
     80004710:	84aa                	mv	s1,a0
     80004712:	89ae                	mv	s3,a1
-  struct proc *p = myproc();
     80004714:	ffffd097          	auipc	ra,0xffffd
     80004718:	34e080e7          	jalr	846(ra) # 80001a62 <myproc>
-  struct stat st;
-  
-  if(f->type == FD_INODE || f->type == FD_DEVICE){
     8000471c:	409c                	lw	a5,0(s1)
     8000471e:	37f9                	addiw	a5,a5,-2
     80004720:	4705                	li	a4,1
     80004722:	04f76863          	bltu	a4,a5,80004772 <filestat+0x6e>
     80004726:	f84a                	sd	s2,48(sp)
     80004728:	892a                	mv	s2,a0
-    ilock(f->ip);
     8000472a:	6c88                	ld	a0,24(s1)
     8000472c:	fffff097          	auipc	ra,0xfffff
     80004730:	05e080e7          	jalr	94(ra) # 8000378a <ilock>
-    stati(f->ip, &st);
     80004734:	fb840593          	addi	a1,s0,-72
     80004738:	6c88                	ld	a0,24(s1)
     8000473a:	fffff097          	auipc	ra,0xfffff
     8000473e:	2de080e7          	jalr	734(ra) # 80003a18 <stati>
-    iunlock(f->ip);
     80004742:	6c88                	ld	a0,24(s1)
     80004744:	fffff097          	auipc	ra,0xfffff
     80004748:	10c080e7          	jalr	268(ra) # 80003850 <iunlock>
-    if(copyout(p->pagetable, addr, (char *)&st, sizeof(st)) < 0)
     8000474c:	46e1                	li	a3,24
     8000474e:	fb840613          	addi	a2,s0,-72
     80004752:	85ce                	mv	a1,s3
@@ -9583,36 +9374,21 @@ filestat(struct file *f, uint64 addr)
     8000475c:	fa2080e7          	jalr	-94(ra) # 800016fa <copyout>
     80004760:	41f5551b          	sraiw	a0,a0,0x1f
     80004764:	7942                	ld	s2,48(sp)
-      return -1;
-    return 0;
-  }
-  return -1;
-}
     80004766:	60a6                	ld	ra,72(sp)
     80004768:	6406                	ld	s0,64(sp)
     8000476a:	74e2                	ld	s1,56(sp)
     8000476c:	79a2                	ld	s3,40(sp)
     8000476e:	6161                	addi	sp,sp,80
     80004770:	8082                	ret
-  return -1;
     80004772:	557d                	li	a0,-1
     80004774:	bfcd                	j	80004766 <filestat+0x62>
 
 0000000080004776 <fileread>:
-
-// Read from file f.
-// addr is a user virtual address.
-int
-fileread(struct file *f, uint64 addr, int n)
-{
     80004776:	7179                	addi	sp,sp,-48
     80004778:	f406                	sd	ra,40(sp)
     8000477a:	f022                	sd	s0,32(sp)
     8000477c:	e84a                	sd	s2,16(sp)
     8000477e:	1800                	addi	s0,sp,48
-  int r = 0;
-
-  if(f->readable == 0)
     80004780:	00854783          	lbu	a5,8(a0)
     80004784:	cbc5                	beqz	a5,80004834 <fileread+0xbe>
     80004786:	ec26                	sd	s1,24(sp)
@@ -9620,27 +9396,16 @@ fileread(struct file *f, uint64 addr, int n)
     8000478a:	84aa                	mv	s1,a0
     8000478c:	89ae                	mv	s3,a1
     8000478e:	8932                	mv	s2,a2
-    return -1;
-
-  if(f->type == FD_PIPE){
     80004790:	411c                	lw	a5,0(a0)
     80004792:	4705                	li	a4,1
     80004794:	04e78963          	beq	a5,a4,800047e6 <fileread+0x70>
-    r = piperead(f->pipe, addr, n);
-  } else if(f->type == FD_DEVICE){
     80004798:	470d                	li	a4,3
     8000479a:	04e78f63          	beq	a5,a4,800047f8 <fileread+0x82>
-    if(f->major < 0 || f->major >= NDEV || !devsw[f->major].read)
-      return -1;
-    r = devsw[f->major].read(1, addr, n);
-  } else if(f->type == FD_INODE){
     8000479e:	4709                	li	a4,2
     800047a0:	08e79263          	bne	a5,a4,80004824 <fileread+0xae>
-    ilock(f->ip);
     800047a4:	6d08                	ld	a0,24(a0)
     800047a6:	fffff097          	auipc	ra,0xfffff
     800047aa:	fe4080e7          	jalr	-28(ra) # 8000378a <ilock>
-    if((r = readi(f->ip, 1, addr, f->off, n)) > 0)
     800047ae:	874a                	mv	a4,s2
     800047b0:	5094                	lw	a3,32(s1)
     800047b2:	864e                	mv	a2,s3
@@ -9650,29 +9415,20 @@ fileread(struct file *f, uint64 addr, int n)
     800047bc:	28a080e7          	jalr	650(ra) # 80003a42 <readi>
     800047c0:	892a                	mv	s2,a0
     800047c2:	00a05563          	blez	a0,800047cc <fileread+0x56>
-      f->off += r;
     800047c6:	509c                	lw	a5,32(s1)
     800047c8:	9fa9                	addw	a5,a5,a0
     800047ca:	d09c                	sw	a5,32(s1)
-    iunlock(f->ip);
     800047cc:	6c88                	ld	a0,24(s1)
     800047ce:	fffff097          	auipc	ra,0xfffff
     800047d2:	082080e7          	jalr	130(ra) # 80003850 <iunlock>
     800047d6:	64e2                	ld	s1,24(sp)
     800047d8:	69a2                	ld	s3,8(sp)
-  } else {
-    panic("fileread");
-  }
-
-  return r;
-}
     800047da:	854a                	mv	a0,s2
     800047dc:	70a2                	ld	ra,40(sp)
     800047de:	7402                	ld	s0,32(sp)
     800047e0:	6942                	ld	s2,16(sp)
     800047e2:	6145                	addi	sp,sp,48
     800047e4:	8082                	ret
-    r = piperead(f->pipe, addr, n);
     800047e6:	6908                	ld	a0,16(a0)
     800047e8:	00000097          	auipc	ra,0x0
     800047ec:	400080e7          	jalr	1024(ra) # 80004be8 <piperead>
@@ -9680,7 +9436,6 @@ fileread(struct file *f, uint64 addr, int n)
     800047f2:	64e2                	ld	s1,24(sp)
     800047f4:	69a2                	ld	s3,8(sp)
     800047f6:	b7d5                	j	800047da <fileread+0x64>
-    if(f->major < 0 || f->major >= NDEV || !devsw[f->major].read)
     800047f8:	02451783          	lh	a5,36(a0)
     800047fc:	03079693          	slli	a3,a5,0x30
     80004800:	92c1                	srli	a3,a3,0x30
@@ -9692,22 +9447,18 @@ fileread(struct file *f, uint64 addr, int n)
     80004812:	97ba                	add	a5,a5,a4
     80004814:	639c                	ld	a5,0(a5)
     80004816:	c78d                	beqz	a5,80004840 <fileread+0xca>
-    r = devsw[f->major].read(1, addr, n);
     80004818:	4505                	li	a0,1
     8000481a:	9782                	jalr	a5
     8000481c:	892a                	mv	s2,a0
     8000481e:	64e2                	ld	s1,24(sp)
     80004820:	69a2                	ld	s3,8(sp)
     80004822:	bf65                	j	800047da <fileread+0x64>
-    panic("fileread");
     80004824:	00004517          	auipc	a0,0x4
     80004828:	d7c50513          	addi	a0,a0,-644 # 800085a0 <etext+0x5a0>
     8000482c:	ffffc097          	auipc	ra,0xffffc
     80004830:	d34080e7          	jalr	-716(ra) # 80000560 <panic>
-    return -1;
     80004834:	597d                	li	s2,-1
     80004836:	b755                	j	800047da <fileread+0x64>
-      return -1;
     80004838:	597d                	li	s2,-1
     8000483a:	64e2                	ld	s1,24(sp)
     8000483c:	69a2                	ld	s3,8(sp)
@@ -9718,15 +9469,8 @@ fileread(struct file *f, uint64 addr, int n)
     80004846:	bf51                	j	800047da <fileread+0x64>
 
 0000000080004848 <filewrite>:
-int
-filewrite(struct file *f, uint64 addr, int n)
-{
-  int r, ret = 0;
-
-  if(f->writable == 0)
     80004848:	00954783          	lbu	a5,9(a0)
     8000484c:	12078963          	beqz	a5,8000497e <filewrite+0x136>
-{
     80004850:	715d                	addi	sp,sp,-80
     80004852:	e486                	sd	ra,72(sp)
     80004854:	e0a2                	sd	s0,64(sp)
@@ -9737,49 +9481,29 @@ filewrite(struct file *f, uint64 addr, int n)
     8000485e:	892a                	mv	s2,a0
     80004860:	8b2e                	mv	s6,a1
     80004862:	8a32                	mv	s4,a2
-    return -1;
-
-  if(f->type == FD_PIPE){
     80004864:	411c                	lw	a5,0(a0)
     80004866:	4705                	li	a4,1
     80004868:	02e78763          	beq	a5,a4,80004896 <filewrite+0x4e>
-    ret = pipewrite(f->pipe, addr, n);
-  } else if(f->type == FD_DEVICE){
     8000486c:	470d                	li	a4,3
     8000486e:	02e78a63          	beq	a5,a4,800048a2 <filewrite+0x5a>
-    if(f->major < 0 || f->major >= NDEV || !devsw[f->major].write)
-      return -1;
-    ret = devsw[f->major].write(1, addr, n);
-  } else if(f->type == FD_INODE){
     80004872:	4709                	li	a4,2
     80004874:	0ee79863          	bne	a5,a4,80004964 <filewrite+0x11c>
     80004878:	f44e                	sd	s3,40(sp)
-    // and 2 blocks of slop for non-aligned writes.
-    // this really belongs lower down, since writei()
-    // might be writing a device like the console.
-    int max = ((MAXOPBLOCKS-1-1-2) / 2) * BSIZE;
-    int i = 0;
-    while(i < n){
     8000487a:	0cc05463          	blez	a2,80004942 <filewrite+0xfa>
     8000487e:	fc26                	sd	s1,56(sp)
     80004880:	ec56                	sd	s5,24(sp)
     80004882:	e45e                	sd	s7,8(sp)
     80004884:	e062                	sd	s8,0(sp)
-    int i = 0;
     80004886:	4981                	li	s3,0
-      int n1 = n - i;
-      if(n1 > max)
     80004888:	6b85                	lui	s7,0x1
     8000488a:	c00b8b93          	addi	s7,s7,-1024 # c00 <_entry-0x7ffff400>
     8000488e:	6c05                	lui	s8,0x1
     80004890:	c00c0c1b          	addiw	s8,s8,-1024 # c00 <_entry-0x7ffff400>
     80004894:	a851                	j	80004928 <filewrite+0xe0>
-    ret = pipewrite(f->pipe, addr, n);
     80004896:	6908                	ld	a0,16(a0)
     80004898:	00000097          	auipc	ra,0x0
     8000489c:	248080e7          	jalr	584(ra) # 80004ae0 <pipewrite>
     800048a0:	a85d                	j	80004956 <filewrite+0x10e>
-    if(f->major < 0 || f->major >= NDEV || !devsw[f->major].write)
     800048a2:	02451783          	lh	a5,36(a0)
     800048a6:	03079693          	slli	a3,a5,0x30
     800048aa:	92c1                	srli	a3,a3,0x30
@@ -9791,22 +9515,15 @@ filewrite(struct file *f, uint64 addr, int n)
     800048bc:	97ba                	add	a5,a5,a4
     800048be:	679c                	ld	a5,8(a5)
     800048c0:	c3f9                	beqz	a5,80004986 <filewrite+0x13e>
-    ret = devsw[f->major].write(1, addr, n);
     800048c2:	4505                	li	a0,1
     800048c4:	9782                	jalr	a5
     800048c6:	a841                	j	80004956 <filewrite+0x10e>
-      if(n1 > max)
     800048c8:	00048a9b          	sext.w	s5,s1
-        n1 = max;
-
-      begin_op();
     800048cc:	00000097          	auipc	ra,0x0
     800048d0:	88c080e7          	jalr	-1908(ra) # 80004158 <begin_op>
-      ilock(f->ip);
     800048d4:	01893503          	ld	a0,24(s2)
     800048d8:	fffff097          	auipc	ra,0xfffff
     800048dc:	eb2080e7          	jalr	-334(ra) # 8000378a <ilock>
-      if ((r = writei(f->ip, 1, addr + i, f->off, n1)) > 0)
     800048e0:	8756                	mv	a4,s5
     800048e2:	02092683          	lw	a3,32(s2)
     800048e6:	01698633          	add	a2,s3,s6
@@ -9816,30 +9533,18 @@ filewrite(struct file *f, uint64 addr, int n)
     800048f4:	262080e7          	jalr	610(ra) # 80003b52 <writei>
     800048f8:	84aa                	mv	s1,a0
     800048fa:	00a05763          	blez	a0,80004908 <filewrite+0xc0>
-        f->off += r;
     800048fe:	02092783          	lw	a5,32(s2)
     80004902:	9fa9                	addw	a5,a5,a0
     80004904:	02f92023          	sw	a5,32(s2)
-      iunlock(f->ip);
     80004908:	01893503          	ld	a0,24(s2)
     8000490c:	fffff097          	auipc	ra,0xfffff
     80004910:	f44080e7          	jalr	-188(ra) # 80003850 <iunlock>
-      end_op();
     80004914:	00000097          	auipc	ra,0x0
     80004918:	8be080e7          	jalr	-1858(ra) # 800041d2 <end_op>
-
-      if(r != n1){
     8000491c:	029a9563          	bne	s5,s1,80004946 <filewrite+0xfe>
-        // error from writei
-        break;
-      }
-      i += r;
     80004920:	013489bb          	addw	s3,s1,s3
-    while(i < n){
     80004924:	0149da63          	bge	s3,s4,80004938 <filewrite+0xf0>
-      int n1 = n - i;
     80004928:	413a04bb          	subw	s1,s4,s3
-      if(n1 > max)
     8000492c:	0004879b          	sext.w	a5,s1
     80004930:	f8fbdce3          	bge	s7,a5,800048c8 <filewrite+0x80>
     80004934:	84e2                	mv	s1,s8
@@ -9849,24 +9554,15 @@ filewrite(struct file *f, uint64 addr, int n)
     8000493c:	6ba2                	ld	s7,8(sp)
     8000493e:	6c02                	ld	s8,0(sp)
     80004940:	a039                	j	8000494e <filewrite+0x106>
-    int i = 0;
     80004942:	4981                	li	s3,0
     80004944:	a029                	j	8000494e <filewrite+0x106>
     80004946:	74e2                	ld	s1,56(sp)
     80004948:	6ae2                	ld	s5,24(sp)
     8000494a:	6ba2                	ld	s7,8(sp)
     8000494c:	6c02                	ld	s8,0(sp)
-    }
-    ret = (i == n ? n : -1);
     8000494e:	033a1e63          	bne	s4,s3,8000498a <filewrite+0x142>
     80004952:	8552                	mv	a0,s4
     80004954:	79a2                	ld	s3,40(sp)
-  } else {
-    panic("filewrite");
-  }
-
-  return ret;
-}
     80004956:	60a6                	ld	ra,72(sp)
     80004958:	6406                	ld	s0,64(sp)
     8000495a:	7942                	ld	s2,48(sp)
@@ -9879,32 +9575,21 @@ filewrite(struct file *f, uint64 addr, int n)
     80004968:	ec56                	sd	s5,24(sp)
     8000496a:	e45e                	sd	s7,8(sp)
     8000496c:	e062                	sd	s8,0(sp)
-    panic("filewrite");
     8000496e:	00004517          	auipc	a0,0x4
     80004972:	c4250513          	addi	a0,a0,-958 # 800085b0 <etext+0x5b0>
     80004976:	ffffc097          	auipc	ra,0xffffc
     8000497a:	bea080e7          	jalr	-1046(ra) # 80000560 <panic>
-    return -1;
     8000497e:	557d                	li	a0,-1
-}
     80004980:	8082                	ret
-      return -1;
     80004982:	557d                	li	a0,-1
     80004984:	bfc9                	j	80004956 <filewrite+0x10e>
     80004986:	557d                	li	a0,-1
     80004988:	b7f9                	j	80004956 <filewrite+0x10e>
-    ret = (i == n ? n : -1);
     8000498a:	557d                	li	a0,-1
     8000498c:	79a2                	ld	s3,40(sp)
     8000498e:	b7e1                	j	80004956 <filewrite+0x10e>
 
 0000000080004990 <pipealloc>:
-  int writeopen;  // write fd is still open
-};
-
-int
-pipealloc(struct file **f0, struct file **f1)
-{
     80004990:	7179                	addi	sp,sp,-48
     80004992:	f406                	sd	ra,40(sp)
     80004994:	f022                	sd	s0,32(sp)
@@ -9913,13 +9598,8 @@ pipealloc(struct file **f0, struct file **f1)
     8000499a:	1800                	addi	s0,sp,48
     8000499c:	84aa                	mv	s1,a0
     8000499e:	8a2e                	mv	s4,a1
-  struct pipe *pi;
-
-  pi = 0;
-  *f0 = *f1 = 0;
     800049a0:	0005b023          	sd	zero,0(a1)
     800049a4:	00053023          	sd	zero,0(a0)
-  if((*f0 = filealloc()) == 0 || (*f1 = filealloc()) == 0)
     800049a8:	00000097          	auipc	ra,0x0
     800049ac:	bbe080e7          	jalr	-1090(ra) # 80004566 <filealloc>
     800049b0:	e088                	sd	a0,0(s1)
@@ -9929,62 +9609,40 @@ pipealloc(struct file **f0, struct file **f1)
     800049bc:	00aa3023          	sd	a0,0(s4)
     800049c0:	c141                	beqz	a0,80004a40 <pipealloc+0xb0>
     800049c2:	e84a                	sd	s2,16(sp)
-    goto bad;
-  if((pi = (struct pipe*)kalloc()) == 0)
     800049c4:	ffffc097          	auipc	ra,0xffffc
     800049c8:	19c080e7          	jalr	412(ra) # 80000b60 <kalloc>
     800049cc:	892a                	mv	s2,a0
     800049ce:	c13d                	beqz	a0,80004a34 <pipealloc+0xa4>
     800049d0:	e44e                	sd	s3,8(sp)
-    goto bad;
-  pi->readopen = 1;
     800049d2:	4985                	li	s3,1
     800049d4:	23352023          	sw	s3,544(a0)
-  pi->writeopen = 1;
     800049d8:	23352223          	sw	s3,548(a0)
-  pi->nwrite = 0;
     800049dc:	20052e23          	sw	zero,540(a0)
-  pi->nread = 0;
     800049e0:	20052c23          	sw	zero,536(a0)
-  initlock(&pi->lock, "pipe");
     800049e4:	00004597          	auipc	a1,0x4
     800049e8:	bdc58593          	addi	a1,a1,-1060 # 800085c0 <etext+0x5c0>
     800049ec:	ffffc097          	auipc	ra,0xffffc
     800049f0:	1d4080e7          	jalr	468(ra) # 80000bc0 <initlock>
-  (*f0)->type = FD_PIPE;
     800049f4:	609c                	ld	a5,0(s1)
     800049f6:	0137a023          	sw	s3,0(a5)
-  (*f0)->readable = 1;
     800049fa:	609c                	ld	a5,0(s1)
     800049fc:	01378423          	sb	s3,8(a5)
-  (*f0)->writable = 0;
     80004a00:	609c                	ld	a5,0(s1)
     80004a02:	000784a3          	sb	zero,9(a5)
-  (*f0)->pipe = pi;
     80004a06:	609c                	ld	a5,0(s1)
     80004a08:	0127b823          	sd	s2,16(a5)
-  (*f1)->type = FD_PIPE;
     80004a0c:	000a3783          	ld	a5,0(s4)
     80004a10:	0137a023          	sw	s3,0(a5)
-  (*f1)->readable = 0;
     80004a14:	000a3783          	ld	a5,0(s4)
     80004a18:	00078423          	sb	zero,8(a5)
-  (*f1)->writable = 1;
     80004a1c:	000a3783          	ld	a5,0(s4)
     80004a20:	013784a3          	sb	s3,9(a5)
-  (*f1)->pipe = pi;
     80004a24:	000a3783          	ld	a5,0(s4)
     80004a28:	0127b823          	sd	s2,16(a5)
-  return 0;
     80004a2c:	4501                	li	a0,0
     80004a2e:	6942                	ld	s2,16(sp)
     80004a30:	69a2                	ld	s3,8(sp)
     80004a32:	a03d                	j	80004a60 <pipealloc+0xd0>
-
- bad:
-  if(pi)
-    kfree((char*)pi);
-  if(*f0)
     80004a34:	6088                	ld	a0,0(s1)
     80004a36:	c119                	beqz	a0,80004a3c <pipealloc+0xac>
     80004a38:	6942                	ld	s2,16(sp)
@@ -9993,38 +9651,25 @@ pipealloc(struct file **f0, struct file **f1)
     80004a3e:	a039                	j	80004a4c <pipealloc+0xbc>
     80004a40:	6088                	ld	a0,0(s1)
     80004a42:	c50d                	beqz	a0,80004a6c <pipealloc+0xdc>
-    fileclose(*f0);
     80004a44:	00000097          	auipc	ra,0x0
     80004a48:	bde080e7          	jalr	-1058(ra) # 80004622 <fileclose>
-  if(*f1)
     80004a4c:	000a3783          	ld	a5,0(s4)
-    fileclose(*f1);
-  return -1;
     80004a50:	557d                	li	a0,-1
-  if(*f1)
     80004a52:	c799                	beqz	a5,80004a60 <pipealloc+0xd0>
-    fileclose(*f1);
     80004a54:	853e                	mv	a0,a5
     80004a56:	00000097          	auipc	ra,0x0
     80004a5a:	bcc080e7          	jalr	-1076(ra) # 80004622 <fileclose>
-  return -1;
     80004a5e:	557d                	li	a0,-1
-}
     80004a60:	70a2                	ld	ra,40(sp)
     80004a62:	7402                	ld	s0,32(sp)
     80004a64:	64e2                	ld	s1,24(sp)
     80004a66:	6a02                	ld	s4,0(sp)
     80004a68:	6145                	addi	sp,sp,48
     80004a6a:	8082                	ret
-  return -1;
     80004a6c:	557d                	li	a0,-1
     80004a6e:	bfcd                	j	80004a60 <pipealloc+0xd0>
 
 0000000080004a70 <pipeclose>:
-
-void
-pipeclose(struct pipe *pi, int writable)
-{
     80004a70:	1101                	addi	sp,sp,-32
     80004a72:	ec06                	sd	ra,24(sp)
     80004a74:	e822                	sd	s0,16(sp)
@@ -10033,60 +9678,38 @@ pipeclose(struct pipe *pi, int writable)
     80004a7a:	1000                	addi	s0,sp,32
     80004a7c:	84aa                	mv	s1,a0
     80004a7e:	892e                	mv	s2,a1
-  acquire(&pi->lock);
     80004a80:	ffffc097          	auipc	ra,0xffffc
     80004a84:	1d0080e7          	jalr	464(ra) # 80000c50 <acquire>
-  if(writable){
     80004a88:	02090d63          	beqz	s2,80004ac2 <pipeclose+0x52>
-    pi->writeopen = 0;
     80004a8c:	2204a223          	sw	zero,548(s1)
-    wakeup(&pi->nread);
     80004a90:	21848513          	addi	a0,s1,536
     80004a94:	ffffd097          	auipc	ra,0xffffd
     80004a98:	6fc080e7          	jalr	1788(ra) # 80002190 <wakeup>
-  } else {
-    pi->readopen = 0;
-    wakeup(&pi->nwrite);
-  }
-  if(pi->readopen == 0 && pi->writeopen == 0){
     80004a9c:	2204b783          	ld	a5,544(s1)
     80004aa0:	eb95                	bnez	a5,80004ad4 <pipeclose+0x64>
-    release(&pi->lock);
     80004aa2:	8526                	mv	a0,s1
     80004aa4:	ffffc097          	auipc	ra,0xffffc
     80004aa8:	260080e7          	jalr	608(ra) # 80000d04 <release>
-    kfree((char*)pi);
     80004aac:	8526                	mv	a0,s1
     80004aae:	ffffc097          	auipc	ra,0xffffc
     80004ab2:	fb4080e7          	jalr	-76(ra) # 80000a62 <kfree>
-  } else
-    release(&pi->lock);
-}
     80004ab6:	60e2                	ld	ra,24(sp)
     80004ab8:	6442                	ld	s0,16(sp)
     80004aba:	64a2                	ld	s1,8(sp)
     80004abc:	6902                	ld	s2,0(sp)
     80004abe:	6105                	addi	sp,sp,32
     80004ac0:	8082                	ret
-    pi->readopen = 0;
     80004ac2:	2204a023          	sw	zero,544(s1)
-    wakeup(&pi->nwrite);
     80004ac6:	21c48513          	addi	a0,s1,540
     80004aca:	ffffd097          	auipc	ra,0xffffd
     80004ace:	6c6080e7          	jalr	1734(ra) # 80002190 <wakeup>
     80004ad2:	b7e9                	j	80004a9c <pipeclose+0x2c>
-    release(&pi->lock);
     80004ad4:	8526                	mv	a0,s1
     80004ad6:	ffffc097          	auipc	ra,0xffffc
     80004ada:	22e080e7          	jalr	558(ra) # 80000d04 <release>
-}
     80004ade:	bfe1                	j	80004ab6 <pipeclose+0x46>
 
 0000000080004ae0 <pipewrite>:
-
-int
-pipewrite(struct pipe *pi, uint64 addr, int n)
-{
     80004ae0:	711d                	addi	sp,sp,-96
     80004ae2:	ec86                	sd	ra,88(sp)
     80004ae4:	e8a2                	sd	s0,80(sp)
@@ -10099,50 +9722,28 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
     80004af2:	84aa                	mv	s1,a0
     80004af4:	8aae                	mv	s5,a1
     80004af6:	8a32                	mv	s4,a2
-  int i = 0;
-  struct proc *pr = myproc();
     80004af8:	ffffd097          	auipc	ra,0xffffd
     80004afc:	f6a080e7          	jalr	-150(ra) # 80001a62 <myproc>
     80004b00:	89aa                	mv	s3,a0
-
-  acquire(&pi->lock);
     80004b02:	8526                	mv	a0,s1
     80004b04:	ffffc097          	auipc	ra,0xffffc
     80004b08:	14c080e7          	jalr	332(ra) # 80000c50 <acquire>
-  while(i < n){
     80004b0c:	0d405863          	blez	s4,80004bdc <pipewrite+0xfc>
     80004b10:	f05a                	sd	s6,32(sp)
     80004b12:	ec5e                	sd	s7,24(sp)
     80004b14:	e862                	sd	s8,16(sp)
-  int i = 0;
     80004b16:	4901                	li	s2,0
-    if(pi->nwrite == pi->nread + PIPESIZE){ //DOC: pipewrite-full
-      wakeup(&pi->nread);
-      sleep(&pi->nwrite, &pi->lock);
-    } else {
-      char ch;
-      if(copyin(pr->pagetable, &ch, addr + i, 1) == -1)
     80004b18:	5b7d                	li	s6,-1
-      wakeup(&pi->nread);
     80004b1a:	21848c13          	addi	s8,s1,536
-      sleep(&pi->nwrite, &pi->lock);
     80004b1e:	21c48b93          	addi	s7,s1,540
     80004b22:	a089                	j	80004b64 <pipewrite+0x84>
-      release(&pi->lock);
     80004b24:	8526                	mv	a0,s1
     80004b26:	ffffc097          	auipc	ra,0xffffc
     80004b2a:	1de080e7          	jalr	478(ra) # 80000d04 <release>
-      return -1;
     80004b2e:	597d                	li	s2,-1
     80004b30:	7b02                	ld	s6,32(sp)
     80004b32:	6be2                	ld	s7,24(sp)
     80004b34:	6c42                	ld	s8,16(sp)
-  }
-  wakeup(&pi->nread);
-  release(&pi->lock);
-
-  return i;
-}
     80004b36:	854a                	mv	a0,s2
     80004b38:	60e6                	ld	ra,88(sp)
     80004b3a:	6446                	ld	s0,80(sp)
@@ -10153,30 +9754,24 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
     80004b44:	7aa2                	ld	s5,40(sp)
     80004b46:	6125                	addi	sp,sp,96
     80004b48:	8082                	ret
-      wakeup(&pi->nread);
     80004b4a:	8562                	mv	a0,s8
     80004b4c:	ffffd097          	auipc	ra,0xffffd
     80004b50:	644080e7          	jalr	1604(ra) # 80002190 <wakeup>
-      sleep(&pi->nwrite, &pi->lock);
     80004b54:	85a6                	mv	a1,s1
     80004b56:	855e                	mv	a0,s7
     80004b58:	ffffd097          	auipc	ra,0xffffd
     80004b5c:	5d4080e7          	jalr	1492(ra) # 8000212c <sleep>
-  while(i < n){
     80004b60:	05495f63          	bge	s2,s4,80004bbe <pipewrite+0xde>
-    if(pi->readopen == 0 || killed(pr)){
     80004b64:	2204a783          	lw	a5,544(s1)
     80004b68:	dfd5                	beqz	a5,80004b24 <pipewrite+0x44>
     80004b6a:	854e                	mv	a0,s3
     80004b6c:	ffffe097          	auipc	ra,0xffffe
     80004b70:	868080e7          	jalr	-1944(ra) # 800023d4 <killed>
     80004b74:	f945                	bnez	a0,80004b24 <pipewrite+0x44>
-    if(pi->nwrite == pi->nread + PIPESIZE){ //DOC: pipewrite-full
     80004b76:	2184a783          	lw	a5,536(s1)
     80004b7a:	21c4a703          	lw	a4,540(s1)
     80004b7e:	2007879b          	addiw	a5,a5,512
     80004b82:	fcf704e3          	beq	a4,a5,80004b4a <pipewrite+0x6a>
-      if(copyin(pr->pagetable, &ch, addr + i, 1) == -1)
     80004b86:	4685                	li	a3,1
     80004b88:	01590633          	add	a2,s2,s5
     80004b8c:	faf40593          	addi	a1,s0,-81
@@ -10184,7 +9779,6 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
     80004b94:	ffffd097          	auipc	ra,0xffffd
     80004b98:	bf2080e7          	jalr	-1038(ra) # 80001786 <copyin>
     80004b9c:	05650263          	beq	a0,s6,80004be0 <pipewrite+0x100>
-      pi->data[pi->nwrite++ % PIPESIZE] = ch;
     80004ba0:	21c4a783          	lw	a5,540(s1)
     80004ba4:	0017871b          	addiw	a4,a5,1
     80004ba8:	20e4ae23          	sw	a4,540(s1)
@@ -10192,23 +9786,18 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
     80004bb0:	97a6                	add	a5,a5,s1
     80004bb2:	faf44703          	lbu	a4,-81(s0)
     80004bb6:	00e78c23          	sb	a4,24(a5)
-      i++;
     80004bba:	2905                	addiw	s2,s2,1
     80004bbc:	b755                	j	80004b60 <pipewrite+0x80>
     80004bbe:	7b02                	ld	s6,32(sp)
     80004bc0:	6be2                	ld	s7,24(sp)
     80004bc2:	6c42                	ld	s8,16(sp)
-  wakeup(&pi->nread);
     80004bc4:	21848513          	addi	a0,s1,536
     80004bc8:	ffffd097          	auipc	ra,0xffffd
     80004bcc:	5c8080e7          	jalr	1480(ra) # 80002190 <wakeup>
-  release(&pi->lock);
     80004bd0:	8526                	mv	a0,s1
     80004bd2:	ffffc097          	auipc	ra,0xffffc
     80004bd6:	132080e7          	jalr	306(ra) # 80000d04 <release>
-  return i;
     80004bda:	bfb1                	j	80004b36 <pipewrite+0x56>
-  int i = 0;
     80004bdc:	4901                	li	s2,0
     80004bde:	b7dd                	j	80004bc4 <pipewrite+0xe4>
     80004be0:	7b02                	ld	s6,32(sp)
@@ -10217,10 +9806,6 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
     80004be6:	bff9                	j	80004bc4 <pipewrite+0xe4>
 
 0000000080004be8 <piperead>:
-
-int
-piperead(struct pipe *pi, uint64 addr, int n)
-{
     80004be8:	715d                	addi	sp,sp,-80
     80004bea:	e486                	sd	ra,72(sp)
     80004bec:	e0a2                	sd	s0,64(sp)
@@ -10233,41 +9818,26 @@ piperead(struct pipe *pi, uint64 addr, int n)
     80004bfa:	84aa                	mv	s1,a0
     80004bfc:	892e                	mv	s2,a1
     80004bfe:	8ab2                	mv	s5,a2
-  int i;
-  struct proc *pr = myproc();
     80004c00:	ffffd097          	auipc	ra,0xffffd
     80004c04:	e62080e7          	jalr	-414(ra) # 80001a62 <myproc>
     80004c08:	8a2a                	mv	s4,a0
-  char ch;
-
-  acquire(&pi->lock);
     80004c0a:	8526                	mv	a0,s1
     80004c0c:	ffffc097          	auipc	ra,0xffffc
     80004c10:	044080e7          	jalr	68(ra) # 80000c50 <acquire>
-  while(pi->nread == pi->nwrite && pi->writeopen){  //DOC: pipe-empty
     80004c14:	2184a703          	lw	a4,536(s1)
     80004c18:	21c4a783          	lw	a5,540(s1)
-    if(killed(pr)){
-      release(&pi->lock);
-      return -1;
-    }
-    sleep(&pi->nread, &pi->lock); //DOC: piperead-sleep
     80004c1c:	21848993          	addi	s3,s1,536
-  while(pi->nread == pi->nwrite && pi->writeopen){  //DOC: pipe-empty
     80004c20:	02f71963          	bne	a4,a5,80004c52 <piperead+0x6a>
     80004c24:	2244a783          	lw	a5,548(s1)
     80004c28:	cf95                	beqz	a5,80004c64 <piperead+0x7c>
-    if(killed(pr)){
     80004c2a:	8552                	mv	a0,s4
     80004c2c:	ffffd097          	auipc	ra,0xffffd
     80004c30:	7a8080e7          	jalr	1960(ra) # 800023d4 <killed>
     80004c34:	e10d                	bnez	a0,80004c56 <piperead+0x6e>
-    sleep(&pi->nread, &pi->lock); //DOC: piperead-sleep
     80004c36:	85a6                	mv	a1,s1
     80004c38:	854e                	mv	a0,s3
     80004c3a:	ffffd097          	auipc	ra,0xffffd
     80004c3e:	4f2080e7          	jalr	1266(ra) # 8000212c <sleep>
-  while(pi->nread == pi->nwrite && pi->writeopen){  //DOC: pipe-empty
     80004c42:	2184a703          	lw	a4,536(s1)
     80004c46:	21c4a783          	lw	a5,540(s1)
     80004c4a:	fcf70de3          	beq	a4,a5,80004c24 <piperead+0x3c>
@@ -10275,36 +9845,24 @@ piperead(struct pipe *pi, uint64 addr, int n)
     80004c50:	a819                	j	80004c66 <piperead+0x7e>
     80004c52:	e85a                	sd	s6,16(sp)
     80004c54:	a809                	j	80004c66 <piperead+0x7e>
-      release(&pi->lock);
     80004c56:	8526                	mv	a0,s1
     80004c58:	ffffc097          	auipc	ra,0xffffc
     80004c5c:	0ac080e7          	jalr	172(ra) # 80000d04 <release>
-      return -1;
     80004c60:	59fd                	li	s3,-1
     80004c62:	a0a5                	j	80004cca <piperead+0xe2>
     80004c64:	e85a                	sd	s6,16(sp)
-  }
-  for(i = 0; i < n; i++){  //DOC: piperead-copy
     80004c66:	4981                	li	s3,0
-    if(pi->nread == pi->nwrite)
-      break;
-    ch = pi->data[pi->nread++ % PIPESIZE];
-    if(copyout(pr->pagetable, addr + i, &ch, 1) == -1)
     80004c68:	5b7d                	li	s6,-1
-  for(i = 0; i < n; i++){  //DOC: piperead-copy
     80004c6a:	05505463          	blez	s5,80004cb2 <piperead+0xca>
-    if(pi->nread == pi->nwrite)
     80004c6e:	2184a783          	lw	a5,536(s1)
     80004c72:	21c4a703          	lw	a4,540(s1)
     80004c76:	02f70e63          	beq	a4,a5,80004cb2 <piperead+0xca>
-    ch = pi->data[pi->nread++ % PIPESIZE];
     80004c7a:	0017871b          	addiw	a4,a5,1
     80004c7e:	20e4ac23          	sw	a4,536(s1)
     80004c82:	1ff7f793          	andi	a5,a5,511
     80004c86:	97a6                	add	a5,a5,s1
     80004c88:	0187c783          	lbu	a5,24(a5)
     80004c8c:	faf40fa3          	sb	a5,-65(s0)
-    if(copyout(pr->pagetable, addr + i, &ch, 1) == -1)
     80004c90:	4685                	li	a3,1
     80004c92:	fbf40613          	addi	a2,s0,-65
     80004c96:	85ca                	mv	a1,s2
@@ -10312,24 +9870,17 @@ piperead(struct pipe *pi, uint64 addr, int n)
     80004c9c:	ffffd097          	auipc	ra,0xffffd
     80004ca0:	a5e080e7          	jalr	-1442(ra) # 800016fa <copyout>
     80004ca4:	01650763          	beq	a0,s6,80004cb2 <piperead+0xca>
-  for(i = 0; i < n; i++){  //DOC: piperead-copy
     80004ca8:	2985                	addiw	s3,s3,1
     80004caa:	0905                	addi	s2,s2,1
     80004cac:	fd3a91e3          	bne	s5,s3,80004c6e <piperead+0x86>
     80004cb0:	89d6                	mv	s3,s5
-      break;
-  }
-  wakeup(&pi->nwrite);  //DOC: piperead-wakeup
     80004cb2:	21c48513          	addi	a0,s1,540
     80004cb6:	ffffd097          	auipc	ra,0xffffd
     80004cba:	4da080e7          	jalr	1242(ra) # 80002190 <wakeup>
-  release(&pi->lock);
     80004cbe:	8526                	mv	a0,s1
     80004cc0:	ffffc097          	auipc	ra,0xffffc
     80004cc4:	044080e7          	jalr	68(ra) # 80000d04 <release>
     80004cc8:	6b42                	ld	s6,16(sp)
-  return i;
-}
     80004cca:	854e                	mv	a0,s3
     80004ccc:	60a6                	ld	ra,72(sp)
     80004cce:	6406                	ld	s0,64(sp)

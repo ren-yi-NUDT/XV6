@@ -5,31 +5,22 @@ user/tests/_va:     file format elf64-littleriscv
 Disassembly of section .text:
 
 0000000000000000 <main>:
-
-int global=1;
-
-int
-main (int argc, char *argv[])
-{
    0:	1101                	addi	sp,sp,-32
    2:	ec06                	sd	ra,24(sp)
    4:	e822                	sd	s0,16(sp)
    6:	1000                	addi	s0,sp,32
-  printf ("location of code : %p\n", main);
    8:	00000597          	auipc	a1,0x0
    c:	ff858593          	addi	a1,a1,-8 # 0 <main>
   10:	00001517          	auipc	a0,0x1
   14:	9a050513          	addi	a0,a0,-1632 # 9b0 <malloc+0x144>
   18:	00000097          	auipc	ra,0x0
   1c:	666080e7          	jalr	1638(ra) # 67e <printf>
-  printf ("location of data : %p\n", &global);
   20:	00001597          	auipc	a1,0x1
   24:	3a058593          	addi	a1,a1,928 # 13c0 <global>
   28:	00001517          	auipc	a0,0x1
   2c:	9a050513          	addi	a0,a0,-1632 # 9c8 <malloc+0x15c>
   30:	00000097          	auipc	ra,0x0
   34:	64e080e7          	jalr	1614(ra) # 67e <printf>
-  printf ("location of heap : %p\n", malloc (1));
   38:	4505                	li	a0,1
   3a:	00001097          	auipc	ra,0x1
   3e:	832080e7          	jalr	-1998(ra) # 86c <malloc>
@@ -38,17 +29,13 @@ main (int argc, char *argv[])
   48:	99c50513          	addi	a0,a0,-1636 # 9e0 <malloc+0x174>
   4c:	00000097          	auipc	ra,0x0
   50:	632080e7          	jalr	1586(ra) # 67e <printf>
-  int x = 3;
   54:	478d                	li	a5,3
   56:	fef42623          	sw	a5,-20(s0)
-  printf ("location of stack: %p\n\n", &x);
   5a:	fec40593          	addi	a1,s0,-20
   5e:	00001517          	auipc	a0,0x1
   62:	99a50513          	addi	a0,a0,-1638 # 9f8 <malloc+0x18c>
   66:	00000097          	auipc	ra,0x0
   6a:	618080e7          	jalr	1560(ra) # 67e <printf>
-  return 0;
-}
   6e:	4501                	li	a0,0
   70:	60e2                	ld	ra,24(sp)
   72:	6442                	ld	s0,16(sp)

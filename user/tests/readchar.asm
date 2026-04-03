@@ -5,12 +5,6 @@ user/tests/_readchar:     file format elf64-littleriscv
 Disassembly of section .text:
 
 0000000000000000 <main>:
-#include "kernel/stat.h"
-#include "user/user.h"
-
-int
-main(int argc, char *argv[])
-{
    0:	7139                	addi	sp,sp,-64
    2:	fc06                	sd	ra,56(sp)
    4:	f822                	sd	s0,48(sp)
@@ -19,33 +13,21 @@ main(int argc, char *argv[])
    a:	ec4e                	sd	s3,24(sp)
    c:	e852                	sd	s4,16(sp)
    e:	0080                	addi	s0,sp,64
-  char c, count;
-  while (1) {
-    count = read(0, &c, 1);
-    if (count < 1 || c == 0)  // EOF
-      break;
-    if(c == '\n' || c == '\r')
   10:	4929                	li	s2,10
   12:	49b5                	li	s3,13
-      continue;
-    printf("%c(%d)\n", c, getpid());
   14:	00001a17          	auipc	s4,0x1
   18:	98ca0a13          	addi	s4,s4,-1652 # 9a0 <malloc+0x14a>
-    count = read(0, &c, 1);
   1c:	4605                	li	a2,1
   1e:	fcf40593          	addi	a1,s0,-49
   22:	4501                	li	a0,0
   24:	00000097          	auipc	ra,0x0
   28:	2dc080e7          	jalr	732(ra) # 300 <read>
-    if (count < 1 || c == 0)  // EOF
   2c:	0ff57513          	zext.b	a0,a0
   30:	c505                	beqz	a0,58 <main+0x58>
   32:	fcf44483          	lbu	s1,-49(s0)
   36:	c08d                	beqz	s1,58 <main+0x58>
-    if(c == '\n' || c == '\r')
   38:	ff2482e3          	beq	s1,s2,1c <main+0x1c>
   3c:	ff3480e3          	beq	s1,s3,1c <main+0x1c>
-    printf("%c(%d)\n", c, getpid());
   40:	00000097          	auipc	ra,0x0
   44:	328080e7          	jalr	808(ra) # 368 <getpid>
   48:	862a                	mv	a2,a0
@@ -54,8 +36,6 @@ main(int argc, char *argv[])
   4e:	00000097          	auipc	ra,0x0
   52:	61a080e7          	jalr	1562(ra) # 668 <printf>
   56:	b7d9                	j	1c <main+0x1c>
-  }
-  exit(0);
   58:	4501                	li	a0,0
   5a:	00000097          	auipc	ra,0x0
   5e:	28e080e7          	jalr	654(ra) # 2e8 <exit>
