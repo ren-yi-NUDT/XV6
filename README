@@ -1,53 +1,227 @@
-xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
-Version 6 (v6).  xv6 loosely follows the structure and style of v6,
-but is implemented for a modern RISC-V multiprocessor using ANSI C.
+# xv6 文件结构详解
 
-ACKNOWLEDGMENTS
+xv6 是 MIT 开发的教学用 Unix-like 操作系统，运行在 RISC-V 架构上。
 
-xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
-to Peer Communications; ISBN: 1-57398-013-7; 1st edition (June 14,
-2000)).  See also https://pdos.csail.mit.edu/6.1810/, which provides
-pointers to on-line resources for v6.
+---
 
-The following people have made contributions: Russ Cox (context switching,
-locking), Cliff Frey (MP), Xiao Yu (MP), Nickolai Zeldovich, and Austin
-Clements.
+## 根目录文件
 
-We are also grateful for the bug reports and patches contributed by
-Takahiro Aoyagi, Silas Boyd-Wickizer, Anton Burtsev, carlclone, Ian
-Chen, Dan Cross, Cody Cutler, Mike CAT, Tej Chajed, Asami Doi,
-eyalz800, Nelson Elhage, Saar Ettinger, Alice Ferrazzi, Nathaniel
-Filardo, flespark, Peter Froehlich, Yakir Goaron, Shivam Handa, Matt
-Harvey, Bryan Henry, jaichenhengjie, Jim Huang, Matúš Jókay, John
-Jolly, Alexander Kapshuk, Anders Kaseorg, kehao95, Wolfgang Keller,
-Jungwoo Kim, Jonathan Kimmitt, Eddie Kohler, Vadim Kolontsov, Austin
-Liew, l0stman, Pavan Maddamsetti, Imbar Marinescu, Yandong Mao, Matan
-Shabtay, Hitoshi Mitake, Carmi Merimovich, Mark Morrissey, mtasm, Joel
-Nider, Hayato Ohhashi, OptimisticSide, Harry Porter, Greg Price, Jude
-Rich, segfault, Ayan Shafqat, Eldar Sehayek, Yongming Shen, Fumiya
-Shigemitsu, Cam Tenny, tyfkda, Warren Toomey, Stephen Tu, Rafael Ubal,
-Amane Uehara, Pablo Ventura, Xi Wang, WaheedHafez, Keiichi Watanabe,
-Nicolas Wolovick, wxdao, Grant Wu, Jindong Zhang, Icenowy Zheng,
-ZhUyU1997, and Zou Chang Wei.
+| 文件 | 作用 |
+|------|------|
+| `Makefile` | 构建系统配置文件，定义编译规则、依赖关系、QEMU 启动参数等 |
+| `fs.img` | 文件系统镜像文件，包含所有用户程序和初始文件系统内容 |
+| `.gdbinit.tmpl-riscv` | GDB 调试配置模板，用于调试 RISC-V 程序 |
+| `mygdb` | 自定义 GDB 调试启动脚本 |
 
+---
 
-The code in the files that constitute xv6 is
-Copyright 2006-2022 Frans Kaashoek, Robert Morris, and Russ Cox.
+## kernel/ - 内核源代码
 
-ERROR REPORTS
+### 启动与初始化
 
-Please send errors and suggestions to Frans Kaashoek and Robert Morris
-(kaashoek,rtm@mit.edu).  The main purpose of xv6 is as a teaching
-operating system for MIT's 6.1810, so we are more interested in
-simplifications and clarifications than new features.
+| 文件 | 作用 |
+|------|------|
+| `entry.S` | 内核入口汇编代码，设置初始页表，跳转到 C 代码 |
+| `start.c` | 在 M-mode 下初始化，设置陷入委托，然后跳转到 S-mode |
+| `main.c` | 内核主函数，初始化各子系统（控制台、内存、进程、文件系统等） |
 
-BUILDING AND RUNNING XV6
+### 进程管理
 
-You will need a RISC-V "newlib" tool chain from
-https://github.com/riscv/riscv-gnu-toolchain, and qemu compiled for
-riscv64-softmmu.  Once they are installed, and in your shell
-search path, you can run "make qemu".
+| 文件 | 作用 |
+|------|------|
+| `proc.c` | 进程管理核心：进程创建、调度、状态转换、exit/wait 等 |
+| `proc.h` | 进程结构体 `struct proc` 和进程表定义 |
+| `swtch.S` | 汇编实现的上下文切换函数，保存/恢复 callee-saved 寄存器 |
 
---------------------------------log:
-1. added files to 'user/tests/', and adjusted Makefile.
-2. modified sh.c to re-exec by appending '/' or '/tests/' to the front of path.
+### 内存管理
+
+| 文件 | 作用 |
+|------|------|
+| `kalloc.c` | 物理内存分配器，管理空闲页面链表 |
+| `vm.c` | 虚拟内存管理：页表创建、地址映射、mappages 等 |
+| `memlayout.h` | 内存布局定义（内核基址、TRAMPOLINE、TRAPFRAME 等） |
+
+### 中断与系统调用
+
+| 文件 | 作用 |
+|------|------|
+| `trap.c` | 陷入处理：中断、异常、系统调用的分发与处理 |
+| `trampoline.S` | 用户态与内核态切换的汇编代码，包含 uservec/userret |
+| `kernelvec.S` | 内核态中断处理向量 |
+| `syscall.c` | 系统调用分发器，根据系统调用号调用对应函数 |
+| `syscall.h` | 系统调用号定义 |
+| `sysproc.c` | 进程相关系统调用：fork、exit、wait、exec、getpid 等 |
+| `sysfile.c` | 文件相关系统调用：read、write、open、close、dup 等 |
+
+### 文件系统
+
+| 文件 | 作用 |
+|------|------|
+| `fs.c` | 文件系统核心：inode 管理、目录操作、文件读写 |
+| `fs.h` | 文件系统数据结构：superblock、dinode、dirent 等 |
+| `log.c` | 日志系统，保证文件系统操作的原子性和崩溃恢复 |
+| `bio.c` | 块设备缓冲区缓存（Buffer Cache） |
+| `file.c` | 文件描述符管理层 |
+| `file.h` | 文件结构体 `struct file` 定义 |
+| `buf.h` | 缓冲区结构体 `struct buf` 定义 |
+
+### 设备驱动
+
+| 文件 | 作用 |
+|------|------|
+| `console.c` | 控制台驱动，处理键盘输入和屏幕输出 |
+| `uart.c` | UART 串口驱动 |
+| `virtio_disk.c` | VirtIO 虚拟磁盘驱动 |
+| `virtio.h` | VirtIO 设备寄存器和结构定义 |
+| `plic.c` | PLIC（平台级中断控制器）驱动 |
+
+### 进程间通信
+
+| 文件 | 作用 |
+|------|------|
+| `pipe.c` | 管道实现，用于进程间通信 |
+
+### 同步原语
+
+| 文件 | 作用 |
+|------|------|
+| `spinlock.c` | 自旋锁实现，用于 SMP 同步 |
+| `spinlock.h` | 自旋锁结构体定义 |
+| `sleeplock.c` | 睡眠锁实现，允许睡眠等待 |
+| `sleeplock.h` | 睡眠锁结构体定义 |
+
+### 程序加载
+
+| 文件 | 作用 |
+|------|------|
+| `exec.c` | exec 系统调用实现，加载 ELF 可执行文件 |
+
+### 输出与字符串
+
+| 文件 | 作用 |
+|------|------|
+| `printf.c` | 内核 printf 实现 |
+| `string.c` | 内核字符串操作函数 |
+
+### 头文件
+
+| 文件 | 作用 |
+|------|------|
+| `defs.h` | 内核全局函数声明 |
+| `param.h` | 系统参数（NPROC、NCPU、PAGE_SIZE 等） |
+| `riscv.h` | RISC-V 寄存器定义、CSR 宏 |
+| `types.h` | 基本类型定义（uint64、uchar 等） |
+| `elf.h` | ELF 文件格式定义 |
+| `stat.h` | 文件状态结构体 stat |
+| `fcntl.h` | 文件控制常量（O_RDONLY、O_WRONLY 等） |
+
+### 链接脚本
+
+| 文件 | 作用 |
+|------|------|
+| `kernel.ld` | 内核链接脚本，定义段布局和内存地址 |
+
+---
+
+## user/ - 用户程序
+
+### 系统初始化
+
+| 文件 | 作用 |
+|------|------|
+| `initcode.S` | 第一个用户进程的汇编代码，调用 exec("/init") |
+| `init.c` | init 进程，启动控制台并执行 shell |
+
+### Shell
+
+| 文件 | 作用 |
+|------|------|
+| `sh.c` | 简单的 Shell 实现，支持管道、重定向 |
+
+### 基本命令
+
+| 文件 | 作用 |
+|------|------|
+| `cat.c` | 连接并显示文件内容 |
+| `echo.c` | 输出命令行参数 |
+| `ls.c` | 列出目录内容 |
+| `grep.c` | 在文件中搜索模式 |
+| `wc.c` | 统计行数、单词数、字节数 |
+| `rm.c` | 删除文件 |
+| `mkdir.c` | 创建目录 |
+| `ln.c` | 创建链接 |
+| `kill.c` | 终止进程 |
+| `xargs.c` | 从标准输入构建并执行命令 |
+
+### 用户库
+
+| 文件 | 作用 |
+|------|------|
+| `ulib.c` | 用户态 C 库：字符串操作、内存移动等 |
+| `umalloc.c` | 用户态内存分配器（malloc/free） |
+| `usys.S` | 系统调用的汇编入口（ECALL 指令） |
+| `usys.pl` | 生成 usys.S 的 Perl 脚本 |
+| `user.h` | 用户态头文件，声明系统调用和库函数 |
+| `user.ld` | 用户程序链接脚本 |
+| `common.h` | 用户程序通用定义 |
+
+### Lab 实验程序
+
+| 文件 | 作用 |
+|------|------|
+| `sleep.c` | sleep 程序，暂停指定秒数 |
+| `pingpong.c` | 管道通信实验，父子进程互发数据 |
+| `primes.c` | 并发素数筛，使用管道和进程实现 |
+| `find.c` | 在目录树中查找文件 |
+
+### 测试程序
+
+| 文件 | 作用 |
+|------|------|
+| `forktest.c` | 测试 fork 系统调用 |
+| `usertests.c` | 综合用户态测试套件 |
+| `grind.c` | 并发压力测试 |
+| `stressfs.c` | 文件系统压力测试 |
+| `zombie.c` | 创建僵尸进程演示 |
+| `loop.c` | 无限循环测试 |
+| `mysh.c` | 自定义 shell |
+
+---
+
+## mkfs/ - 文件系统工具
+
+| 文件 | 作用 |
+|------|------|
+| `mkfs.c` | 文件系统镜像创建工具，将用户程序打包成 fs.img |
+
+---
+
+## gdbcmds/ - GDB 调试脚本
+
+| 文件 | 作用 |
+|------|------|
+| `0.gdb` | 基础调试脚本 |
+| `5-virtiodisk-intr.gdb` | VirtIO 磁盘中断调试 |
+| `5-virtiodisk-rw.gdb` | VirtIO 磁盘读写调试 |
+
+---
+
+## 其他目录
+
+| 目录 | 作用 |
+|------|------|
+| `demo_txts/` | 演示用的文本文件 |
+| `practice_txts/` | 练习用的文本文件 |
+
+---
+
+## 编译产物（.o, .asm, .sym 等）
+
+| 后缀 | 作用 |
+|------|------|
+| `.o` | 目标文件（编译后的二进制） |
+| `.asm` | 反汇编文件（用于调试和学习） |
+| `.sym` | 符号表文件 |
+| `.d` | 依赖关系文件 |
+| `kernel` | 链接后的内核二进制 |
+| `_xxx` | 链接后的用户程序二进制 |
