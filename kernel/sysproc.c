@@ -5,6 +5,20 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "kernel/sysinfo.h"
+
+// 空闲页链表节点结构
+struct run {
+  struct run *next;
+};
+
+// 外部变量声明
+extern struct {
+  struct spinlock lock;
+  struct run *freelist;
+} kmem;
+
+extern struct proc proc[NPROC];
 
 uint64
 sys_exit(void)
@@ -98,5 +112,67 @@ sys_trace(void)
   int mask;
   argint(0, &mask);
   myproc() -> trace_mask = mask;
+  return 0;
+}
+
+uint64
+count_free_memory(void){
+  struct run *r;
+  uint64 count = 0;
+  acquire(&kmem.lock);
+  r = kmem.freelist;
+  while(r){
+    count += PGSIZE;
+    r = r->next;
+  }
+  release(&kmem.lock);
+
+  return count;
+}
+
+uint64
+count_processes(void){
+  struct proc *p;
+  uint64 count = 0;
+  uint64 unused = 0;
+
+  for (p = proc; p < &proc[NPROC]; p++){
+    if (p->state != UNUSED){
+      count++;
+    }
+    else{
+      unused++;
+    }
+  }
+
+  return count;
+}
+
+uint64
+sys_sysinfo(void)
+{
+  struct sysinfo info;
+  uint64 addr;
+  struct proc *p = myproc();
+
+  argaddr(0, &addr);
+
+  info.freemem = count_free_memory();
+
+  // 统计进程数量
+  struct proc *pi;
+  info.nproc = 0;
+  info.unused_proc_num = 0;
+  for(pi = proc; pi < &proc[NPROC]; pi++){
+    if(pi->state != UNUSED)
+      info.nproc++;
+    else
+      info.unused_proc_num++;
+  }
+
+  // 将数据从内核空间复制到用户空间
+  if(copyout(p->pagetable, addr, (char *)&info, sizeof(info)) < 0)
+    return -1;
+
   return 0;
 }
