@@ -148,4 +148,4 @@ Breakpoint 5, clockintr () at kernel/trap.c:165
 4: cpus[$mhartid].proc.name = "loop", '\000' <repeats 11 times>
   //可见马上捕获到时钟中断
 
-//请问接下来连续5次（含当前这次）时钟中断的恢复点分别是什么？
+//请问接下来连续5次（含当前4这次）时钟中断的恢复点分别是什么？
