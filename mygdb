@@ -1,6 +1,0 @@
-#!/bin/sh
-
-GDBPORT=$(expr `id -u` % 5000 + 25000)
-export GDBTARGET="localhost:$GDBPORT"
-
-gdb-multiarch -x gdbcmds/0.gdb

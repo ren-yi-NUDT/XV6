@@ -77,18 +77,6 @@ runcmd(struct cmd *cmd)
     if(ecmd->argv[0] == 0)
       exit(1);
     exec(ecmd->argv[0], ecmd->argv);
-
-    //retry from the root dir   // by wyj. (10 lines)
-    static char tmp[101];
-    tmp[0] = '/';
-    strcpy(tmp+1, ecmd->argv[0]);
-    exec(tmp, ecmd->argv);
-
-    //retry from the "/tests/" dir
-    strcpy(tmp, "/tests/");
-    strcpy(tmp+7, ecmd->argv[0]);
-    exec(tmp, ecmd->argv);
-
     fprintf(2, "exec %s failed\n", ecmd->argv[0]);
     break;
 

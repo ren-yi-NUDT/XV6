@@ -36,6 +36,5 @@ entry("getpid");
 entry("sbrk");
 entry("sleep");
 entry("uptime");
-entry("yield");
-entry("lock");
-entry("unlock");
+entry("connect");
+entry("pgaccess");
