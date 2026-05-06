@@ -1,0 +1,37 @@
+Which other xv6 system call(s) could be made faster using this shared page? Explain how.
+- uptime() 可以通过共享页加速。sys_uptime() 的实现仅仅是读取全局变量 ticks的值，不修改任何内核状态。可以在 struct usyscall 中新增一个 uint ticks 字段，内核在每次时钟中断时同步更新该值，用户态直接从共享页读取即可，无需陷入内核。
+For every leaf page in the vmprint output, explain what it logically contains and what its permission bits are.
+- init 进程 exec 之后的页表包含 7 个叶子页：
+
+page table 0x0000000087f6b000
+.. 0: pte 0x0000000021fd9c01 pa 0x0000000087f67000
+.. .. 0: pte 0x0000000021fd9801 pa 0x0000000087f66000
+.. .. .. 0: pte 0x0000000021fda01b pa 0x0000000087f68000 va 0x0000000000000000 flags RXU 
+
+- 代码段，存放 init 的可执行代码。权限 RXU：用户可读可执行，不可写。
+
+.. .. .. 1: pte 0x0000000021fd9417 pa 0x0000000087f65000 va 0x0000000000001000 flags RWU
+
+- 数据段，存放 init 的全局变量。权限 RWU：用户可读可写。
+
+.. .. .. 2: pte 0x0000000021fd9007 pa 0x0000000087f64000 va 0x0000000000002000 flags RW
+
+- 栈保护页。权限 RW：无 U 位，用户态不可访问，用于检测栈溢出。
+
+.. .. .. 3: pte 0x0000000021fd8c17 pa 0x0000000087f63000 va 0x0000000000003000 flags RWU
+
+- 用户栈。权限 RWU：用户可读可写，栈从此处向低地址增长。
+
+.. 255: pte 0x0000000021fda801 pa 0x0000000087f6a000
+.. .. 511: pte 0x0000000021fda401 pa 0x0000000087f69000
+.. .. .. 509: pte 0x0000000021fdcc13 pa 0x0000000087f73000 va 0x0000003fffffd000 flags RU
+
+- USYSCALL 共享页。权限 RU：用户只读，存储 struct usyscall（包含进程 PID），用于加速 getpid()。
+
+.. .. .. 510: pte 0x0000000021fdd007 pa 0x0000000087f74000 va 0x0000003fffffe000 flags RW
+
+- trapframe 页。权限 RW：无 U 位，保存用户态进入内核时的寄存器状态。
+
+.. .. .. 511: pte 0x0000000020001c0b pa 0x0000000080007000 va 0x0000003ffffff000 flags RX
+
+- trampoline 页。权限 RX：无 U 位，存放 uservec/userret汇编代码，用于用户态与内核态之间的切换。
