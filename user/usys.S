@@ -105,18 +105,3 @@ uptime:
  li a7, SYS_uptime
  ecall
  ret
-.global yield
-yield:
- li a7, SYS_yield
- ecall
- ret
-.global lock
-lock:
- li a7, SYS_lock
- ecall
- ret
-.global unlock
-unlock:
- li a7, SYS_unlock
- ecall
- ret

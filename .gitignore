@@ -1,22 +1,25 @@
-# xv6 编译产物
-
-# 目标文件
+*~
+_*
 *.o
+*.d
 *.asm
 *.sym
-
-# 内核
+*.img
+vectors.S
+bootblock
+entryother
+initcode
+initcode.out
+kernelmemfs
+mkfs
 kernel/kernel
-
-# 用户程序二进制
-user/_*
-
-# 测试程序二进制
-user/tests/_*
-
-# 文件系统镜像
-fs.img
-
-# 其他
-*.d
-*.out
+user/usys.S
+.gdbinit
+*.zip
+xv6.out*
+.vagrant/
+submissions/
+ph
+barrier
+/lab-*.json
+.DS_Store

@@ -108,8 +108,6 @@ printf(const char *fmt, ...)
 {
   va_list ap;
 
-  lock();
   va_start(ap, fmt);
   vprintf(1, fmt, ap);
-  unlock();
 }
