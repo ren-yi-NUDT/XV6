@@ -91,3 +91,7 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64 sys_cowstats(void){
+  return get_cow_saved();
+}
