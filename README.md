@@ -2,4 +2,4 @@
 除本branch外，每个分支均独立包含一个大作业，有详细Readme文件
 如果派上用场，记得star哦
 
-本branch上包含实时更新的服务器lab
+本branch上会包含实时更新的服务器lab，位于main分支，若出现服务器断网情况大家可以clone本仓库
