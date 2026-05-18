@@ -475,4 +475,5 @@ Breakpoint 4, swap_out () at swap.c:216
 0xfdc018:	0xff	0xff	0xff	0xff	0xff	0xff	0xff	0xff
   //可见2号交换页也已被分配
 
-//思考：Linux 0.11采用的是什么页面替换算法？下一个被换出的页面会是几号？
+//思考：接下来被淘汰的3个页面/页帧分别是几号？Linux 0.12采用的是什么页面替换算法？
+
