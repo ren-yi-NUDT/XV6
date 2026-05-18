@@ -26,7 +26,11 @@ void *thread1(void *arg) {
   A();
 
   //------------{  begin to add
-
+  pthread_mutex_lock(&m);
+  done++;
+  if (done == 2) pthread_cond_signal(&c);
+  pthread_mutex_unlock(&m);
+  
   
   //------------}  end to add
     
@@ -40,7 +44,10 @@ void *thread2(void *arg) {
   B();
     
   //------------{  begin to add
-
+  pthread_mutex_lock(&m);
+  done++;
+  if (done == 2) pthread_cond_signal(&c);
+  pthread_mutex_unlock(&m);
   
   //------------}  end to add
     
@@ -52,8 +59,11 @@ void *thread3(void *arg) {
   printf("thread3: begin\n");
 
   //------------{  begin to add
-
-  
+  pthread_mutex_lock(&m);
+  while (done < 2){
+    pthread_cond_wait(&c, &m);
+  }
+  pthread_mutex_unlock(&m);
   //------------}  end to add
     
   C();    
