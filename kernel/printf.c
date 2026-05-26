@@ -15,8 +15,6 @@
 #include "defs.h"
 #include "proc.h"
 
-struct sleeplock print_lock;
-
 volatile int panicked = 0;
 
 // lock to avoid interleaving concurrent printf's.
@@ -134,6 +132,4 @@ printfinit(void)
 {
   initlock(&pr.lock, "pr");
   pr.locking = 1;
-
-  initsleeplock(&print_lock, "userprint");
 }

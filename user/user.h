@@ -23,11 +23,6 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 
-/* added by wyj. */
-int yield(void);
-int lock(void);
-int unlock(void);
-
 // ulib.c
 int stat(const char*, struct stat*);
 char* strcpy(char*, const char*);

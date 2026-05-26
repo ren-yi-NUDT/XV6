@@ -6,8 +6,6 @@
 #include "spinlock.h"
 #include "proc.h"
 
-extern struct sleeplock print_lock;
-
 uint64
 sys_exit(void)
 {
@@ -57,6 +55,8 @@ sys_sleep(void)
   uint ticks0;
 
   argint(0, &n);
+  if(n < 0)
+    n = 0;
   acquire(&tickslock);
   ticks0 = ticks;
   while(ticks - ticks0 < n){
@@ -90,25 +90,4 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
-}
-
-uint64
-sys_yield(void)
-{
-  yield();
-  return 0;
-}
-
-uint64
-sys_lock(void)
-{
-  acquiresleep(&print_lock);
-  return 0;
-}
-
-uint64
-sys_unlock(void)
-{
-  releasesleep(&print_lock);
-  return 0;
 }

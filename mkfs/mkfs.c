@@ -127,32 +127,10 @@ main(int argc, char *argv[])
   strcpy(de.name, "..");
   iappend(rootino, &de, sizeof(de));
 
-  // create '/tests/'
-  uint tests_ino = ialloc(T_DIR);
-  
-  bzero(&de, sizeof(de));
-  de.inum = xshort(tests_ino);
-  strcpy(de.name, "tests");
-  iappend(rootino, &de, sizeof(de));
-
-  bzero(&de, sizeof(de));
-  de.inum = xshort(tests_ino);
-  strcpy(de.name, ".");
-  iappend(tests_ino, &de, sizeof(de));
-
-  bzero(&de, sizeof(de));
-  de.inum = xshort(rootino);
-  strcpy(de.name, "..");
-  iappend(tests_ino, &de, sizeof(de));
-
   for(i = 2; i < argc; i++){
     // get rid of "user/"
     char *shortname;
-    int in_tests = 0;
-    if(strncmp(argv[i], "user/tests/", 11) == 0){
-      shortname = argv[i] + 11;
-      in_tests = 1;
-    }else if(strncmp(argv[i], "user/", 5) == 0)
+    if(strncmp(argv[i], "user/", 5) == 0)
       shortname = argv[i] + 5;
     else
       shortname = argv[i];
@@ -174,10 +152,7 @@ main(int argc, char *argv[])
     bzero(&de, sizeof(de));
     de.inum = xshort(inum);
     strncpy(de.name, shortname, DIRSIZ);
-    if (in_tests)
-      iappend(tests_ino, &de, sizeof(de));
-    else
-      iappend(rootino, &de, sizeof(de));
+    iappend(rootino, &de, sizeof(de));
 
     while((cc = read(fd, buf, sizeof(buf))) > 0)
       iappend(inum, buf, cc);

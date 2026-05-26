@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+
+import re
+import subprocess
+from gradelib import *
+
+
+r = Runner(save("xv6.out"))
+
+@test(10, "uthread")
+def test_uthread():
+    r.run_qemu(shell_script([
+        'uthread'
+    ]))
+    expected = ['thread_a started', 'thread_b started', 'thread_c started']
+    expected.extend(['thread_%s %d' % (tid, n) for n in range(100) for tid in ('c', 'a', 'b')])
+    expected.extend(['thread_c: exit after 100', 'thread_a: exit after 100', 'thread_b: exit after 100'])
+    expected.append('thread_schedule: no runnable threads')
+    if not re.findall('\n'.join(expected), r.qemu.output, re.M):
+        raise AssertionError('Output does not match expected output')
+
+@test(5, "answers-thread.txt")
+def test_answers():
+    # just a simple sanity check, will be graded manually
+    check_answers("answers-thread.txt")
+    
+# test the first ph task: add locks to eliminate the missing keys.
+# @test(10, "ph_safe")
+def test_ph_safe():
+    subprocess.run(['make', 'ph'], check=True)
+    result = subprocess.run(['./ph', '2'], stdout=subprocess.PIPE, check=True)
+    out = result.stdout.decode("utf-8")
+    matches = re.findall(r'^\d+: (\d+) keys missing$', out, re.MULTILINE)
+    assert_equal(len(matches), 2)
+    assert_equal(int(matches[0]), 0)
+    assert_equal(int(matches[1]), 0)
+
+# 测试冲突和命中计数
+# @test(10, "ph_hit_collision")
+def test_ph_hit_colision():
+    subprocess.run(['make', 'ph'], check=True)
+    result = subprocess.run(['./ph', '2'], stdout=subprocess.PIPE, check=True)
+    out = result.stdout.decode("utf-8")
+    # 正则表达式匹配命中次数和冲突次数
+    hit_count_match = re.search(r'Hit count: (\d+)', out)
+    collision_count_match = re.search(r'Collision count: (\d+)', out)
+    # 断言命中次数和冲突次数存在
+    assert hit_count_match, "Missing hit count"
+    assert collision_count_match, "Missing collision count"
+    # 提取命中次数和冲突次数
+    hit_count = int(hit_count_match.group(1))
+    collision_count = int(collision_count_match.group(1))
+    # 检查命中次数是否在范围内
+    assert 199000 <= hit_count <= 200000, f"Hit count {hit_count} is out of range"
+    # 检查冲突次数是否在范围内
+    assert 99000 <= collision_count <= 100000, f"Collision count {collision_count} is out of range"
+
+
+# test the second ph task: locking that allows put() parallelism
+# @test(10, "ph_fast")
+def test_ph_fast():
+    subprocess.run(['make', 'ph'], check=True)
+    result = subprocess.run(['./ph', '2'], stdout=subprocess.PIPE, check=True)
+    out = result.stdout.decode("utf-8")
+    rate2 = re.findall(r' (\d+) puts.second$', out, re.MULTILINE)
+    assert_equal(len(rate2), 1)
+    result = subprocess.run(['./ph', '1'], stdout=subprocess.PIPE)
+    out = result.stdout.decode("utf-8")
+    rate1 = re.findall(r' (\d+) puts.second$', out, re.MULTILINE)
+    assert_equal(len(rate1), 1)
+    rate1 = float(rate1[0])
+    rate2 = float(rate2[0])
+    # demand that 2 threads yield at least 1.25x the
+    # throughput of a single thread.
+    if rate2 < 1.25 * rate1:
+        raise AssertionError('Parallel put() speedup is less than 1.25x')
+
+# @test(15, "barrier_test_1")
+def test_barrier_1():
+    subprocess.run(['make', 'barrier'])
+    result = subprocess.run(['./barrier', '3', '1'], stdout=subprocess.PIPE)
+    out = result.stdout.decode("utf-8")
+    # 构建一个精确匹配预期输出的正则表达式
+    pattern = (r'ROUND 0: High priority thread arrived at barrier 2\n'
+               r'ROUND 0: Normal priority thread arrived at barrier 2\n'
+               r'ROUND 0: Normal priority thread arrived at barrier 2\n'
+               r'ROUND 1: High priority thread arrived at barrier 2\n'
+               r'ROUND 1: Normal priority thread arrived at barrier 2\n'
+               r'ROUND 1: Normal priority thread arrived at barrier 2\n'
+               r'OK; passed')
+    if not re.match(pattern, out):
+        raise AssertionError('Barrier test1 failed')
+    
+# @test(15, "barrier_test_2")
+def test_barrier_2():
+    subprocess.run(['make', 'barrier'])
+    result = subprocess.run(['./barrier', '7', '4'], stdout=subprocess.PIPE)
+    out = result.stdout.decode("utf-8")
+    # 构建一个精确匹配预期输出的正则表达式
+    pattern = (r'ROUND 0: High priority thread arrived at barrier 2\n'
+           r'ROUND 0: High priority thread arrived at barrier 2\n'
+           r'ROUND 0: High priority thread arrived at barrier 2\n'
+           r'ROUND 0: High priority thread arrived at barrier 2\n'
+           r'ROUND 0: Normal priority thread arrived at barrier 2\n'
+           r'ROUND 0: Normal priority thread arrived at barrier 2\n'
+           r'ROUND 0: Normal priority thread arrived at barrier 2\n'
+           r'ROUND 1: High priority thread arrived at barrier 2\n'
+           r'ROUND 1: High priority thread arrived at barrier 2\n'
+           r'ROUND 1: High priority thread arrived at barrier 2\n'
+           r'ROUND 1: High priority thread arrived at barrier 2\n'
+           r'ROUND 1: Normal priority thread arrived at barrier 2\n'
+           r'ROUND 1: Normal priority thread arrived at barrier 2\n'
+           r'ROUND 1: Normal priority thread arrived at barrier 2\n'
+           r'OK; passed')
+    if not re.match(pattern, out):
+        raise AssertionError('Barrier test2 failed')
+
+@test(10, "answers-thread.txt")
+def test_answers():
+    # just a simple sanity check, will be graded manually
+    check_answers("answers-thread.txt")
+
+@test(1, "time")
+def test_time():
+    check_time()
+
+run_tests()
+
