@@ -1,0 +1,10 @@
+1. Why callee-save only?
+
+- 因为 thread_switch 是被thread_schedule以普通函数调用方式调用的。
+- 调用者保存寄存器（a0-a7, t0-t6等）已经由编译器在调用 thread_switch 之前保存到了被切换线程的栈上，调用返回时会自动恢复。只有被调用者保存寄存器（ra, sp, s0-s11）需要手动保存，
+- 因为这些寄存器在函数调用间必须保持不变。
+
+2. Breakpoint triggered before uthread? 
+
+- 因为 xv6中可能有其他进程（如shell）的代码也映射在相同的用户地址空间位置。
+- gdb设置的行号断点是基于源文件行号的，如果 shell或其他进程在执行时碰巧命中了该地址，就会触发断点。

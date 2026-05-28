@@ -107,7 +107,8 @@ void
 printf(const char *fmt, ...)
 {
   va_list ap;
-
+  cstart();
   va_start(ap, fmt);
   vprintf(1, fmt, ap);
+  cend();
 }

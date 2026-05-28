@@ -21,7 +21,6 @@ entry("wait");
 entry("pipe");
 entry("read");
 entry("write");
-entry("close");
 entry("kill");
 entry("exec");
 entry("open");
@@ -36,3 +35,16 @@ entry("getpid");
 entry("sbrk");
 entry("sleep");
 entry("uptime");
+entry("cstart");
+entry("cend");
+entry("close");
+
+entry("createlock");
+entry("closelock");
+entry("lock");
+entry("unlock");
+
+entry("createcond");
+entry("closecond");
+entry("cond_wait");
+entry("cond_signal");

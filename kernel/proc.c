@@ -15,6 +15,8 @@ struct proc *initproc;
 int nextpid = 1;
 struct spinlock pid_lock;
 
+void * g_page;  // the page shared by all procs.  (by wyj.)
+
 extern void forkret(void);
 static void freeproc(struct proc *p);
 
@@ -55,6 +57,9 @@ procinit(void)
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
+  }
+  if((g_page = kalloc()) == 0){
+    panic("kalloc()");
   }
 }
 
@@ -202,6 +207,15 @@ proc_pagetable(struct proc *p)
     return 0;
   }
 
+  // map the shared page
+  if(mappages(pagetable, SHARED_PAGE, PGSIZE,
+              (uint64)g_page, PTE_R | PTE_W | PTE_U) < 0){
+    uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+    uvmunmap(pagetable, TRAPFRAME, 1, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
+
   return pagetable;
 }
 
@@ -212,6 +226,7 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
+  uvmunmap(pagetable, SHARED_PAGE, 1, 0);
   uvmfree(pagetable, sz);
 }
 
@@ -308,6 +323,16 @@ fork(void)
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
 
+  // increment reference counts on open lock descriptors.
+  for(i = 0; i < NOLOCK; i++)
+    if(p->olock[i])
+      np->olock[i] = lockdup(p->olock[i]);
+
+  // increment reference counts on open cond descriptors.
+  for(i = 0; i < NOCOND; i++)
+    if(p->ocond[i])
+      np->ocond[i] = conddup(p->ocond[i]);
+
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
@@ -357,6 +382,24 @@ exit(int status)
       struct file *f = p->ofile[fd];
       fileclose(f);
       p->ofile[fd] = 0;
+    }
+  }
+
+    // Close all open locks.
+  for(int ld = 0; ld < NOLOCK; ld++){
+    if(p->olock[ld]){
+      struct lock *l = p->olock[ld];
+      lockclose(l);
+      p->olock[ld] = 0;
+    }
+  }
+
+    // Close all open condition variables.
+  for(int cd = 0; cd < NOCOND; cd++){
+    if(p->ocond[cd]){
+      struct cond *c = p->ocond[cd];
+      condclose(c);
+      p->ocond[cd] = 0;
     }
   }
 
@@ -567,7 +610,7 @@ sleep(void *chan, struct spinlock *lk)
 }
 
 // Wake up all processes sleeping on chan.
-// Must be called without any p->lock.
+// Must be called without any p->lock (当前进程的除外).
 void
 wakeup(void *chan)
 {

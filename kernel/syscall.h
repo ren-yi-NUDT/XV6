@@ -19,4 +19,16 @@
 #define SYS_unlink 18
 #define SYS_link   19
 #define SYS_mkdir  20
-#define SYS_close  21
+#define SYS_cstart 21
+#define SYS_cend   22
+#define SYS_close  23
+
+#define SYS_createlock  24
+#define SYS_closelock   25
+#define SYS_lock        26
+#define SYS_unlock      27
+
+#define SYS_createcond  28
+#define SYS_closecond   29
+#define SYS_cond_wait   30
+#define SYS_cond_signal 31

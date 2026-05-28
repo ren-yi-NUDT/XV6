@@ -59,6 +59,11 @@ OBJS += \
 	$K/pci.o
 endif
 
+ifeq ($(LAB),concurrency)
+OBJS += \
+	$K/lock.o \
+	$K/cond.o
+endif
 
 # riscv64-unknown-elf- or riscv64-linux-gnu-
 # perhaps in /opt/riscv/bin
@@ -86,36 +91,38 @@ LD = $(TOOLPREFIX)ld
 OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
 
-CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -gdwarf-2
+COMMON_CFLAGS = -Wall -Werror -fno-omit-frame-pointer -ggdb -gdwarf-2
 
 ifdef LAB
 LABUPPER = $(shell echo $(LAB) | tr a-z A-Z)
 XCFLAGS += -DSOL_$(LABUPPER) -DLAB_$(LABUPPER)
 endif
 
-CFLAGS += $(XCFLAGS)
-CFLAGS += -MD
-CFLAGS += -mcmodel=medany
-CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
-CFLAGS += -I.
-CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
+COMMON_CFLAGS += $(XCFLAGS)
+COMMON_CFLAGS += -MD
+COMMON_CFLAGS += -mcmodel=medany
+COMMON_CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
+COMMON_CFLAGS += -I.
+COMMON_CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 
 ifeq ($(LAB),net)
-CFLAGS += -DNET_TESTS_PORT=$(SERVERPORT)
+COMMON_CFLAGS += -DNET_TESTS_PORT=$(SERVERPORT)
 endif
 
 ifdef KCSAN
-CFLAGS += -DKCSAN
+COMMON_CFLAGS += -DKCSAN
 KCSANFLAG = -fsanitize=thread -fno-inline
 endif
 
 # Disable PIE when possible (for Ubuntu 16.10 toolchain)
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
-CFLAGS += -fno-pie -no-pie
+COMMON_CFLAGS += -fno-pie -no-pie
 endif
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]nopie'),)
-CFLAGS += -fno-pie -nopie
+COMMON_CFLAGS += -fno-pie -nopie
 endif
+
+CFLAGS = $(COMMON_CFLAGS) -O
 
 LDFLAGS = -z max-page-size=4096
 
@@ -213,20 +220,24 @@ endif
 
 ifeq ($(LAB),concurrency)
 UPROGS += \
-	$U/_uthread
+	$U/_uthread_test \
+	$U/_lock_test \
+	$U/_throttle
 
 $U/uthread_switch.o : $U/uthread_switch.S
 	$(CC) $(CFLAGS) -c -o $U/uthread_switch.o $U/uthread_switch.S
 
-$U/_uthread: $U/uthread.o $U/uthread_switch.o $(ULIB)
-	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_uthread $U/uthread.o $U/uthread_switch.o $(ULIB)
-	$(OBJDUMP) -S $U/_uthread > $U/uthread.asm
+$U/_uthread_test: $U/uthread_test.o $U/uthread.o $U/uthread_switch.o $(ULIB)
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_uthread_test $U/uthread_test.o $U/uthread.o $U/uthread_switch.o $(ULIB)
+	$(OBJDUMP) -S $U/_uthread_test > $U/uthread_test.asm
 
-ph: notxv6/ph.c
-	gcc -o ph -g -O2 $(XCFLAGS) notxv6/ph.c -pthread
+$U/lock_test.o : $U/lock_test.c
+	$(CC) $(COMMON_CFLAGS) -c -o $@ $<
 
-barrier: notxv6/barrier.c
-	gcc -o barrier -g -O2 $(XCFLAGS) notxv6/barrier.c -pthread
+$U/_throttle: $U/throttle.o $U/semaphore.o $(ULIB)
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_throttle $U/throttle.o $U/semaphore.o $(ULIB)
+	$(OBJDUMP) -S $U/_throttle > $U/throttle.asm
+
 endif
 
 ifeq ($(LAB),pgtbl)
@@ -266,8 +277,7 @@ clean:
 	*/*.o */*.d */*.asm */*.sym \
 	$U/initcode $U/initcode.out $U/usys.S $U/_* \
 	$K/kernel \
-	mkfs/mkfs fs.img .gdbinit __pycache__ xv6.out* \
-	ph barrier
+	mkfs/mkfs fs.img .gdbinit __pycache__ xv6.out*
 
 # try to generate a unique GDB port
 GDBPORT = $(shell expr `id -u` % 5000 + 25000)
@@ -297,10 +307,10 @@ endif
 qemu: $K/kernel fs.img
 	$(QEMU) $(QEMUOPTS)
 
-.gdbinit: .gdbinit.tmpl-riscv
+0.gdb: .gdbinit.tmpl-riscv
 	sed "s/:1234/:$(GDBPORT)/" < $^ > $@
 
-qemu-gdb: $K/kernel .gdbinit fs.img
+qemu-gdb: $K/kernel 0.gdb fs.img
 	@echo "*** Now run 'gdb' in another window." 1>&2
 	$(QEMU) $(QEMUOPTS) -S $(QEMUGDB)
 

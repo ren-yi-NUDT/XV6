@@ -62,3 +62,4 @@
 //   TRAPFRAME (p->trapframe, used by the trampoline)
 //   TRAMPOLINE (the same page as in the kernel)
 #define TRAPFRAME (TRAMPOLINE - PGSIZE)
+#define SHARED_PAGE (TRAPFRAME - PGSIZE)  /* 此页面由所有进程共享 */

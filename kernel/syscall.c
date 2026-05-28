@@ -100,7 +100,19 @@ extern uint64 sys_mknod(void);
 extern uint64 sys_unlink(void);
 extern uint64 sys_link(void);
 extern uint64 sys_mkdir(void);
+extern uint64 sys_cstart(void);
+extern uint64 sys_cend(void);
 extern uint64 sys_close(void);
+
+extern uint64 sys_createlock(void);
+extern uint64 sys_closelock(void);
+extern uint64 sys_lock(void);
+extern uint64 sys_unlock(void);
+
+extern uint64 sys_createcond(void);
+extern uint64 sys_closecond(void);
+extern uint64 sys_cond_wait(void);
+extern uint64 sys_cond_signal(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -125,7 +137,19 @@ static uint64 (*syscalls[])(void) = {
 [SYS_unlink]  sys_unlink,
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
+[SYS_cstart]  sys_cstart,
+[SYS_cend]    sys_cend,
 [SYS_close]   sys_close,
+
+[SYS_createlock]  sys_createlock,
+[SYS_closelock]   sys_closelock,
+[SYS_lock]        sys_lock,
+[SYS_unlock]      sys_unlock,
+
+[SYS_createcond]  sys_createcond,
+[SYS_closecond]   sys_closecond,
+[SYS_cond_wait]   sys_cond_wait,
+[SYS_cond_signal] sys_cond_signal,
 };
 
 void

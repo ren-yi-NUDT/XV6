@@ -2,6 +2,10 @@
 #define T_FILE    2   // File
 #define T_DEVICE  3   // Device
 
+#ifndef NULL
+#define NULL ((void *)0)
+#endif
+
 struct stat {
   int dev;     // File system's disk device
   uint ino;    // Inode number
