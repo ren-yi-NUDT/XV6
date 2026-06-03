@@ -73,9 +73,15 @@ int vector_add_all(Vector* dest, Vector* src) {
   int result = 0;
 
   //-----------------------{  begin to modify
-  Mutex_lock(&dest->m);
-  Spin(0.01);
-  Mutex_lock(&src->m);
+  if (&dest->m < &src->m) {
+      Mutex_lock(&dest->m);
+      Spin(0.01);
+      Mutex_lock(&src->m);
+  } else {
+      Mutex_lock(&src->m);
+      Spin(0.01);
+      Mutex_lock(&dest->m);
+  }
   //-----------------------}  end of modification
 
   if (!dest || !src || dest->elem_size != src->elem_size) goto quit;

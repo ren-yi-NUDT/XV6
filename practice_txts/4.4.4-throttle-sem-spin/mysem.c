@@ -9,8 +9,10 @@ void mysem_init(mysem_t *s, int value) {
 void mysem_wait(mysem_t *s) {
   Mutex_lock(&s->lock);
   //----------------------{ begin to modify
-  while (s->value <= 0)
-    ;
+  while (s->value <= 0) {
+    Mutex_unlock(&s->lock);
+    Mutex_lock(&s->lock);
+  }
   s->value--;
   //----------------------} end
   Mutex_unlock(&s->lock);
