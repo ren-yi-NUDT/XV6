@@ -41,7 +41,7 @@ Breakpoint 1 at 0x8000008c: file kernel/start.c, line 22.
 Breakpoint 2 at 0x80002520: file kernel/proc.c, line 660.
 
 //跟踪到init.c:main()
-(gdb) b exec
+(gdb) b exec.c:exec
 Breakpoint 3 at 0x80004bb0: file kernel/exec.c, line 24.
 
 (gdb) c
@@ -67,11 +67,13 @@ Breakpoint 3, exec (path=path@entry=0x3fffffdf00 "/init", argv=argv@entry=0x3fff
 (gdb) add-symbol-file user/_init 0
 add symbol table from file "user/_init" at
         .text_addr = 0x0
-	Reading symbols from user/_init...
-	(gdb) b init.c:main
-	Breakpoint 4 at 0x0: file user/init.c, line 16.
-	(gdb) c
-	Continuing.
+Reading symbols from user/_init...
+
+(gdb) b init.c:main
+Breakpoint 4 at 0x0: file user/init.c, line 16.
+
+(gdb) c
+Continuing.
 
 Breakpoint 4, main () at user/init.c:16
 16      {
@@ -179,6 +181,6 @@ lock = {locked = 0, lk = {locked = 0, name = 0x800086a0 "sleep lock", cpu = 0x0 
 valid = 1, type = 3, major = 1, minor = 0, nlink = 1, size = 0, addrs = {0 <repeats 13 times>}}
 
 //请问第24行的dup语句（sys_dup）执行完后: 
-//1. 该进程的打开文件表共引用了几个 File 对象？
+//1. 该进程的打开文件表（ofile[]）共引用了几个 File 对象（地址相同算同一个）？
 //2. 2号文件描述符所对应的索引节点号是多少？
-
+//3. 继续运行，在2号进程第一次开始执行open系统调用时，它的打开文件表中有几个有效表项？

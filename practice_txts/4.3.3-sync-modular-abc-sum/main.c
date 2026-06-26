@@ -32,7 +32,7 @@ void p3(){
 }
 
 //------------{  begin to add
-synchronizer_t s1, s2;
+
 //------------}  end to add
 
 void *thread1(void *arg) {
@@ -42,8 +42,8 @@ void *thread1(void *arg) {
   p1();
 
   //------------{  begin to add
-  sync_signal(&s1);
-  //------------}  end to add
+
+  //------------{  end to add
 
   printf("thread1: end\n");
   return NULL;
@@ -56,7 +56,7 @@ void *thread2(void *arg) {
   p2();
 
   //------------{  begin to add
-  sync_signal(&s2);
+
   //------------}  end to add
 
   printf("thread2: end\n");
@@ -67,12 +67,11 @@ void *thread3(void *arg) {
   printf("thread3: begin\n");
 
   //------------{  begin to add
-  sync_wait(&s1);
-  sync_wait(&s2);
+
   //------------}  end to add
 
   p3();
-
+    
   printf("thread3: end\n");
   return NULL;
 }
@@ -88,15 +87,12 @@ int main(int argc, char *argv[]) {
   int i;
   pthread_t t[THREAD_NUM];
 
-  sync_init(&s1);
-  sync_init(&s2);
-
   for(i=0; i<THREAD_NUM; i++)
     Pthread_create(&t[i], NULL, functions[i], NULL);
 
   void *result;
   for(i=0; i<THREAD_NUM; i++)
     Pthread_join(t[i], &result);
-
+  
   return 0;
 }

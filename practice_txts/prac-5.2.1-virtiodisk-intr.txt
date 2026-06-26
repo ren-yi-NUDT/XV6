@@ -84,7 +84,7 @@ Breakpoint 3, virtio_disk_intr () at kernel/virtio_disk.c:321
    // ^-------描述符0所对应请求已处理完，这个记录是ring[0]
 {id = 0, len = 0}, {id = 0, len = 0}, {id = 0, len = 0}, {id = 0, len = 0}, {id = 0, len = 0}, {id = 0, len = 0}, {id = 0, len = 0}}}
 disk.used_idx: 0
-   // ^---队列中已处理完请求有ring[0]
+   // ^---这是队列的读指针，队列中已处理完请求有ring[0]
 disk.ops[0]: $2 = {type = 0, reserved = 0, sector = 2}
                   // ^---描述符0对应请求是读操作，从2号扇区开始。
 disk.info[0]: $3 = {b = 0x80016a10 <bcache+24>, status = 0 '\000'}
@@ -136,4 +136,4 @@ disk.info[0]: $9 = {b = 0x80016e68 <bcache+1136>, status = 0 '\000'}
 
 
 // 请继续调试分析，并回答：
-// 1. 下次硬盘中断发生时，disk.used队列中新增的已处理写请求的内容是什么？
+// 1. 接下来的多次硬盘中断发生时，disk.used队列中会增加已处理请求，其中第一个已处理的写请求的起始扇区号是什么？
